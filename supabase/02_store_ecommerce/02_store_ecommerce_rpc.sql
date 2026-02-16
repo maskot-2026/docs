@@ -99,5 +99,71 @@ BEGIN
 END;
 $$ LANGUAGE plpgsql SECURITY INVOKER;
 
+-- ============================================================================
+-- HU-2.4: Calculadora de Ración Diaria
+-- ============================================================================
 
-
+-- RPC: Calcular ración diaria según inputs del usuario
+CREATE OR REPLACE FUNCTION calculate_daily_ration(
+    p_weight_kg NUMERIC,
+    p_age_years INTEGER,
+    p_is_neutered BOOLEAN,
+    p_body_condition TEXT,
+    p_activity_level TEXT
+) RETURNS JSONB AS $$
+DECLARE
+    v_rer NUMERIC;
+    v_mer NUMERIC;
+    v_activity_factor NUMERIC;
+    v_daily_grams NUMERIC;
+BEGIN
+    -- Validar inputs
+    IF p_weight_kg IS NULL OR p_weight_kg <= 0 THEN
+        RETURN jsonb_build_object('error', 'Peso inválido');
+    END IF;
+    
+    -- Paso 1: Calcular RER (Requerimiento Energético en Reposo)
+    -- Fórmula: RER = 70 * (peso_kg^0.75)
+    v_rer := 70 * POWER(p_weight_kg, 0.75);
+    
+    -- Paso 2: Determinar factor de actividad según nivel
+    v_activity_factor := CASE p_activity_level
+        WHEN 'bajo' THEN 1.2
+        WHEN 'medio' THEN 1.4
+        WHEN 'alto' THEN 1.6
+        ELSE 1.4  -- Default: medio
+    END;
+    
+    -- Paso 3: Ajuste por esterilización (-10% metabolismo)
+    IF p_is_neutered THEN
+        v_activity_factor := v_activity_factor * 0.9;
+    END IF;
+    
+    -- Paso 4: Ajuste por condición corporal
+    v_activity_factor := CASE p_body_condition
+        WHEN 'delgado' THEN v_activity_factor * 1.1   -- +10% para ganar peso
+        WHEN 'sobrepeso' THEN v_activity_factor * 0.9  -- -10% para perder peso
+        ELSE v_activity_factor  -- 'ideal': sin ajuste
+    END;
+    
+    -- Paso 5: Calcular MER (Mantenimiento Energético Requerido)
+    v_mer := v_rer * v_activity_factor;
+    
+    -- Paso 6: Convertir kcal a gramos de alimento
+    -- Asumiendo 350 kcal por cada 100g de alimento seco premium
+    v_daily_grams := (v_mer / 350) * 100;
+    
+    -- Retornar resultado
+    RETURN jsonb_build_object(
+        'daily_kcal', ROUND(v_mer, 0),
+        'daily_grams', ROUND(v_daily_grams, 0),
+        'rer', ROUND(v_rer, 0),
+        'activity_factor', ROUND(v_activity_factor, 2),
+        'recommendation', CASE
+            WHEN v_daily_grams < 100 THEN 'Consulta con veterinario para dosis precisas'
+            WHEN v_daily_grams > 1000 THEN 'Considera dividir en 2-3 porciones diarias'
+            ELSE 'Dividir en 2 porciones diarias'
+        END
+    );
+END;
+$$ LANGUAGE plpgsql SECURITY INVOKER;
