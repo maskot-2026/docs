@@ -11,119 +11,122 @@ DECLARE
     v_date TEXT;
     v_sequence TEXT;
 BEGIN
-    v_date := TO_CHAR(NOW(), 'YYYYMMDD');
-    v_sequence := LPAD(FLOOR(RANDOM() * 999999 + 1)::TEXT, 6, '0');
-    RETURN 'MK-' || v_date || '-' || v_sequence;
-END;
-$$ LANGUAGE plpgsql SECURITY DEFINER;
-
--- RPC: Crear orden completa (transacción multi-tabla)
-CREATE OR REPLACE FUNCTION create_order(
-    p_user_id UUID,
-    p_cart_id BIGINT,
-    p_shipping_address_id BIGINT,
-    p_payment_method payment_method,
-    p_payment_token_id BIGINT DEFAULT NULL
-) RETURNS JSONB AS $$
-DECLARE
-    v_cart RECORD;
-    v_order_id BIGINT;
-    v_order_number TEXT;
-    v_totals JSONB;
-    v_item JSONB;
-    v_shipping RECORD;
-BEGIN
-    -- Verificar autenticación
-    IF auth.uid() IS NULL OR auth.uid() != p_user_id THEN
-        RAISE EXCEPTION 'Not authorized';
-    END IF;
+        v_date := TO_CHAR(NOW(), 'YYYYMMDD');
+        v_sequence := LPAD(FLOOR(RANDOM() * 999999 + 1)::TEXT, 6, '0');
+        RETURN 'MK-' || v_date || '-' || v_sequence;
+    END;
+    $$ LANGUAGE plpgsql SECURITY DEFINER;
     
-    -- Obtener carrito
-    SELECT * INTO v_cart FROM carts WHERE id = p_cart_id AND user_id = p_user_id;
-    IF v_cart IS NULL THEN
-        RETURN jsonb_build_object('error', 'Carrito no encontrado');
-    END IF;
-    
-    -- Obtener dirección de envío
-    SELECT * INTO v_shipping FROM shipping_addresses 
-    WHERE id = p_shipping_address_id AND user_id = p_user_id;
-    IF v_shipping IS NULL THEN
-        RETURN jsonb_build_object('error', 'Dirección no encontrada');
-    END IF;
-    
-    -- Calcular totales
-    v_totals := calculate_cart_totals(p_cart_id, v_shipping.district);
-    
-    -- Generar número de orden
-    v_order_number := generate_order_number();
-    
-    -- Crear orden
-    INSERT INTO orders (
-        order_number, user_id, subtotal, discount, shipping_cost, total,
-        shipping_address, payment_method, payment_status
-    )
-    VALUES (
-        v_order_number,
-        p_user_id,
-        (v_totals->>'subtotal')::NUMERIC,
-        (v_totals->>'discount')::NUMERIC,
-        (v_totals->>'shipping_cost')::NUMERIC,
-        (v_totals->>'total')::NUMERIC,
-        to_jsonb(v_shipping),
-        p_payment_method,
-        'pending'
-    )
-    RETURNING id INTO v_order_id;
-    
-    -- Crear items de orden
-    FOR v_item IN SELECT * FROM jsonb_array_elements(v_cart.items)
-    LOOP
-        INSERT INTO order_items (order_id, product_id, variant_info, quantity, unit_price, is_subscription)
+    -- RPC: Crear orden completa (transacción multi-tabla)
+    CREATE OR REPLACE FUNCTION create_order(
+        p_profile_id BIGINT,
+        p_cart_id BIGINT,
+        p_shipping_address_id BIGINT,
+        p_payment_method payment_method,
+        p_payment_token_id BIGINT DEFAULT NULL
+    ) RETURNS JSONB AS $$
+    DECLARE
+        v_cart RECORD;
+        v_order_id BIGINT;
+        v_order_number TEXT;
+        v_totals JSONB;
+        v_item JSONB;
+        v_shipping RECORD;
+    BEGIN
+        -- Verificar autenticación y propiedad del perfil
+        IF auth.uid() IS NULL OR NOT EXISTS (SELECT 1 FROM profiles WHERE id = p_profile_id AND user_id = auth.uid() AND deleted_at IS NULL) THEN
+            RAISE EXCEPTION 'Not authorized';
+        END IF;
+        
+        -- Obtener carrito
+        SELECT * INTO v_cart FROM carts WHERE id = p_cart_id AND profile_id = p_profile_id;
+        IF v_cart IS NULL THEN
+            RETURN jsonb_build_object('error', 'Carrito no encontrado');
+        END IF;
+        
+        -- Obtener dirección de envío
+        SELECT * INTO v_shipping FROM shipping_addresses 
+        WHERE id = p_shipping_address_id AND profile_id = p_profile_id;
+        IF v_shipping IS NULL THEN
+            RETURN jsonb_build_object('error', 'Dirección no encontrada');
+        END IF;
+        
+        -- Calcular totales
+        v_totals := calculate_cart_totals(p_cart_id, v_shipping.district);
+        
+        -- Generar número de orden
+        v_order_number := generate_order_number();
+        
+        -- Crear orden
+        INSERT INTO orders (
+            order_number, profile_id, subtotal, discount, shipping_cost, total,
+            shipping_address, payment_method, payment_status
+        )
         VALUES (
-            v_order_id,
-            (v_item->>'product_id')::BIGINT,
-            v_item->'variant_info',
-            (v_item->>'quantity')::INTEGER,
-            (v_item->>'price')::NUMERIC,
-            COALESCE((v_item->>'is_subscription')::BOOLEAN, FALSE)
+            v_order_number,
+            p_profile_id,
+            (v_totals->>'subtotal')::NUMERIC,
+            (v_totals->>'discount')::NUMERIC,
+            (v_totals->>'shipping_cost')::NUMERIC,
+            (v_totals->>'total')::NUMERIC,
+            to_jsonb(v_shipping),
+            p_payment_method,
+            'pending'
+        )
+        RETURNING id INTO v_order_id;
+        
+        -- Crear items de orden
+        FOR v_item IN SELECT * FROM jsonb_array_elements(v_cart.items)
+        LOOP
+            INSERT INTO order_items (order_id, product_id, variant_info, quantity, unit_price, is_subscription)
+            VALUES (
+                v_order_id,
+                (v_item->>'product_id')::BIGINT,
+                v_item->'variant_info',
+                (v_item->>'quantity')::INTEGER,
+                (v_item->>'price')::NUMERIC,
+                COALESCE((v_item->>'is_subscription')::BOOLEAN, FALSE)
+            );
+            
+            -- Decrementar stock
+            UPDATE products SET stock_quantity = stock_quantity - (v_item->>'quantity')::INTEGER
+            WHERE id = (v_item->>'product_id')::BIGINT;
+        END LOOP;
+        
+        -- Limpiar carrito
+        DELETE FROM carts WHERE id = p_cart_id;
+        
+        RETURN jsonb_build_object(
+            'order_id', v_order_id,
+            'order_number', v_order_number,
+            'total', v_totals->>'total'
+        );
+    END;
+    $$ LANGUAGE plpgsql SECURITY DEFINER;
+    
+    -- RPC: Actualizar estado de orden con historial
+    CREATE OR REPLACE FUNCTION update_order_status(
+        p_order_id BIGINT,
+        p_new_status order_status,
+        p_notes TEXT DEFAULT NULL
+    ) RETURNS JSONB AS $$
+    BEGIN
+        -- Actualizar orden
+        UPDATE orders SET status = p_new_status, updated_at = NOW()
+        WHERE id = p_order_id;
+        
+        -- Registrar en historial (obtener profile_id del auth.uid actual)
+        INSERT INTO order_status_history (order_id, status, notes, created_by)
+        VALUES (
+            p_order_id, 
+            p_new_status, 
+            p_notes, 
+            (SELECT id FROM profiles WHERE user_id = auth.uid() AND deleted_at IS NULL)
         );
         
-        -- Decrementar stock
-        UPDATE products SET stock_quantity = stock_quantity - (v_item->>'quantity')::INTEGER
-        WHERE id = (v_item->>'product_id')::BIGINT;
-    END LOOP;
-    
-    -- Limpiar carrito
-    DELETE FROM carts WHERE id = p_cart_id;
-    
-    RETURN jsonb_build_object(
-        'order_id', v_order_id,
-        'order_number', v_order_number,
-        'total', v_totals->>'total'
-    );
-END;
-$$ LANGUAGE plpgsql SECURITY DEFINER;
-
--- RPC: Actualizar estado de orden con historial
-CREATE OR REPLACE FUNCTION update_order_status(
-    p_order_id BIGINT,
-    p_new_status order_status,
-    p_notes TEXT DEFAULT NULL
-) RETURNS JSONB AS $$
-BEGIN
-    -- Actualizar orden
-    UPDATE orders SET status = p_new_status, updated_at = NOW()
-    WHERE id = p_order_id;
-    
-    -- Registrar en historial
-    INSERT INTO order_status_history (order_id, status, notes, created_by)
-    VALUES (p_order_id, p_new_status, p_notes, auth.uid());
-    
-    RETURN jsonb_build_object('success', true, 'order_id', p_order_id, 'new_status', p_new_status);
-END;
-$$ LANGUAGE plpgsql SECURITY DEFINER;
-
--- RPC: Agregar tracking de envío
+        RETURN jsonb_build_object('success', true, 'order_id', p_order_id, 'new_status', p_new_status);
+    END;
+    $$ LANGUAGE plpgsql SECURITY DEFINER;
 CREATE OR REPLACE FUNCTION add_order_shipment(
     p_order_id BIGINT,
     p_carrier TEXT,
@@ -167,7 +170,7 @@ BEGIN
     
     -- Obtener suscripción
     SELECT * INTO v_subscription FROM subscriptions 
-    WHERE id = p_subscription_id AND user_id = auth.uid();
+    WHERE id = p_subscription_id AND profile_id = (SELECT id FROM profiles WHERE user_id = auth.uid() AND deleted_at IS NULL);
     
     IF v_subscription IS NULL THEN
         RETURN jsonb_build_object('success', false, 'error', 'Suscripción no encontrada');
@@ -200,7 +203,7 @@ DECLARE
     v_next_billing TIMESTAMPTZ;
 BEGIN
     SELECT * INTO v_subscription FROM subscriptions 
-    WHERE id = p_subscription_id AND user_id = auth.uid();
+    WHERE id = p_subscription_id AND profile_id = (SELECT id FROM profiles WHERE user_id = auth.uid() AND deleted_at IS NULL);
     
     IF v_subscription IS NULL THEN
         RETURN jsonb_build_object('success', false, 'error', 'Suscripción no encontrada');
@@ -232,7 +235,7 @@ DECLARE
     v_subscription RECORD;
 BEGIN
     SELECT * INTO v_subscription FROM subscriptions 
-    WHERE id = p_subscription_id AND user_id = auth.uid();
+    WHERE id = p_subscription_id AND profile_id = (SELECT id FROM profiles WHERE user_id = auth.uid() AND deleted_at IS NULL);
     
     IF v_subscription IS NULL THEN
         RETURN jsonb_build_object('success', false, 'error', 'Suscripción no encontrada');
@@ -257,7 +260,7 @@ DECLARE
     v_new_date TIMESTAMPTZ;
 BEGIN
     SELECT * INTO v_subscription FROM subscriptions 
-    WHERE id = p_subscription_id AND user_id = auth.uid();
+    WHERE id = p_subscription_id AND profile_id = (SELECT id FROM profiles WHERE user_id = auth.uid() AND deleted_at IS NULL);
     
     IF v_subscription IS NULL THEN
         RETURN jsonb_build_object('success', false, 'error', 'Suscripción no encontrada');

@@ -9,7 +9,7 @@
 
 -- RPC: Crear solicitud de cuenta B2B
 CREATE OR REPLACE FUNCTION create_b2b_account_request(
-    p_user_id UUID,
+    p_profile_id BIGINT,
     p_business_name TEXT,
     p_ruc TEXT,
     p_professional_affix TEXT,
@@ -28,7 +28,7 @@ BEGIN
     END IF;
     
     -- Verificar si ya existe una solicitud para este usuario
-    IF EXISTS (SELECT 1 FROM b2b_accounts WHERE user_id = p_user_id) THEN
+    IF EXISTS (SELECT 1 FROM b2b_accounts WHERE profile_id = p_profile_id) THEN
         RETURN jsonb_build_object(
             'success', false,
             'error', 'Ya existe una solicitud de cuenta B2B para este usuario'
@@ -45,7 +45,7 @@ BEGIN
     
     -- Crear registro de cuenta B2B
     INSERT INTO b2b_accounts (
-        user_id,
+        profile_id,
         business_name,
         ruc,
         professional_affix,
@@ -53,7 +53,7 @@ BEGIN
         document_url,
         status
     ) VALUES (
-        p_user_id,
+        p_profile_id,
         p_business_name,
         p_ruc,
         p_professional_affix,
@@ -79,7 +79,7 @@ $$ LANGUAGE plpgsql SECURITY DEFINER;
 -- ============================================================================
 
 -- RPC: Obtener productos B2B con validación de cuenta
-CREATE OR REPLACE FUNCTION get_b2b_products(p_user_id UUID)
+CREATE OR REPLACE FUNCTION get_b2b_products(p_profile_id BIGINT)
 RETURNS TABLE (
     product_id BIGINT,
     name TEXT,
@@ -96,7 +96,7 @@ BEGIN
     -- Validar que usuario tenga cuenta B2B aprobada
     IF NOT EXISTS (
         SELECT 1 FROM b2b_accounts
-        WHERE user_id = p_user_id AND status = 'approved'
+        WHERE profile_id = p_profile_id AND status = 'approved'
     ) THEN
         RAISE EXCEPTION 'Usuario no tiene cuenta B2B aprobada';
     END IF;
@@ -124,7 +124,7 @@ END;
 $$ LANGUAGE plpgsql SECURITY DEFINER;
 
 -- RPC: Verificar elegibilidad B2B de usuario
-CREATE OR REPLACE FUNCTION check_b2b_eligibility(p_user_id UUID)
+CREATE OR REPLACE FUNCTION check_b2b_eligibility(p_profile_id BIGINT)
 RETURNS JSONB AS $$
 DECLARE
     v_account RECORD;
@@ -132,7 +132,7 @@ BEGIN
     -- Buscar cuenta B2B del usuario
     SELECT * INTO v_account 
     FROM b2b_accounts 
-    WHERE user_id = p_user_id;
+    WHERE profile_id = p_profile_id;
     
     IF v_account IS NULL THEN
         RETURN jsonb_build_object(
@@ -180,7 +180,7 @@ $$ LANGUAGE plpgsql SECURITY INVOKER;
 -- RPC: Aprobar cuenta B2B
 CREATE OR REPLACE FUNCTION approve_b2b_account(
     p_account_id BIGINT,
-    p_admin_id UUID
+    p_admin_profile_id BIGINT
 ) RETURNS JSONB AS $$
 DECLARE
     v_account RECORD;
@@ -199,15 +199,15 @@ BEGIN
     -- Actualizar estado
     UPDATE b2b_accounts
     SET status = 'approved',
-        approved_by = p_admin_id,
+        approved_by = p_admin_profile_id,
         approved_at = NOW(),
         updated_at = NOW()
     WHERE id = p_account_id;
     
-    -- Actualizar perfil de usuario
-    UPDATE profiles
-    SET is_b2b_user = TRUE
-    WHERE id = v_account.user_id;
+    -- Asignar rol B2B resolviendo su ID por nombre
+    INSERT INTO profile_roles (profile_id, role_id)
+    SELECT v_account.profile_id, id FROM roles WHERE name = 'b2b'
+    ON CONFLICT (profile_id, role_id) DO NOTHING;
     
     -- TODO: Enviar email de aprobación al usuario
     -- (Implementar con Supabase Edge Functions)
@@ -223,7 +223,7 @@ $$ LANGUAGE plpgsql SECURITY DEFINER;
 -- RPC: Rechazar cuenta B2B
 CREATE OR REPLACE FUNCTION reject_b2b_account(
     p_account_id BIGINT,
-    p_admin_id UUID,
+    p_admin_profile_id BIGINT,
     p_reason TEXT
 ) RETURNS JSONB AS $$
 DECLARE
@@ -249,7 +249,7 @@ BEGIN
     UPDATE b2b_accounts
     SET status = 'rejected',
         rejection_reason = p_reason,
-        approved_by = p_admin_id,  -- Registro de quién rechazó
+        approved_by = p_admin_profile_id,  -- Registro de quién rechazó
         updated_at = NOW()
     WHERE id = p_account_id;
     
@@ -267,7 +267,7 @@ $$ LANGUAGE plpgsql SECURITY DEFINER;
 -- RPC: Suspender/Reactivar cuenta B2B
 CREATE OR REPLACE FUNCTION toggle_b2b_account_status(
     p_account_id BIGINT,
-    p_admin_id UUID,
+    p_admin_profile_id BIGINT,
     p_suspend BOOLEAN
 ) RETURNS JSONB AS $$
 DECLARE
@@ -300,10 +300,15 @@ BEGIN
         updated_at = NOW()
     WHERE id = p_account_id;
     
-    -- Actualizar perfil de usuario
-    UPDATE profiles
-    SET is_b2b_user = (v_new_status = 'approved')
-    WHERE id = v_account.user_id;
+    -- Actualizar rol del usuario resolviendo su ID por nombre
+    IF v_new_status = 'approved' THEN
+        INSERT INTO profile_roles (profile_id, role_id)
+        SELECT v_account.profile_id, id FROM roles WHERE name = 'b2b'
+        ON CONFLICT (profile_id, role_id) DO NOTHING;
+    ELSE
+        DELETE FROM profile_roles
+        WHERE profile_id = v_account.profile_id AND role_id = (SELECT id FROM roles WHERE name = 'b2b');
+    END IF;
     
     RETURN jsonb_build_object(
         'success', true,
