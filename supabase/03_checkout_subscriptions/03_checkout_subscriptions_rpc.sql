@@ -151,7 +151,11 @@ BEGIN
     IF p_contact_email IS NOT NULL THEN
         v_email := p_contact_email;
     ELSE
-        SELECT email INTO v_email FROM profiles WHERE id = p_profile_id;
+        v_email := auth.jwt()->>'email';
+    END IF;
+
+    IF v_email IS NULL THEN
+        RETURN jsonb_build_object('success', false, 'error', 'Email de contacto es requerido');
     END IF;
 
     -- 6. Crear la orden central

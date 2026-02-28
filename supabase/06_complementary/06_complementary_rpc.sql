@@ -11,10 +11,9 @@ DECLARE
     v_profile_id BIGINT;
 BEGIN
     -- Crear perfil desde metadata
-    INSERT INTO profiles (user_id, email, full_name, avatar_url)
+    INSERT INTO profiles (user_id, full_name, avatar_url)
     VALUES (
         NEW.id,
-        NEW.email,
         NEW.raw_user_meta_data->>'full_name',
         NEW.raw_user_meta_data->>'avatar_url'
     ) RETURNING id INTO v_profile_id;
