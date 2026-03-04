@@ -35,6 +35,8 @@
 - [ ] Loading skeleton mientras cargan datos dinámicos
 - [ ] Mobile-first responsive
 
+**NOTA:** Ultima seccion de Organizaciones Aliadas o Patrocinadores, Startup Perú 12G, Incubagraria, Santander X.
+
 **Frontend:** `src/features/home/pages/LandingPage.tsx` + `homePageService.ts`
 
 **Supabase (`01_identity_landings`):**
@@ -392,13 +394,11 @@ CREATE TABLE products (
     slug TEXT NOT NULL UNIQUE,
     description TEXT,
     short_description TEXT,
-    price NUMERIC(10, 2) NOT NULL CHECK (price > 0),
-    compare_at_price NUMERIC(10, 2) CHECK (compare_at_price > 0),
+    sub_discount_pct INTEGER DEFAULT 0 CHECK (sub_discount_pct BETWEEN 0 AND 100),
     images TEXT[] NOT NULL DEFAULT '{}',
     category_id BIGINT REFERENCES product_categories(id) ON DELETE SET NULL,
-    variants JSONB NOT NULL DEFAULT '{}'::jsonb, -- Opciones/variantes (ej. tamaño, peso)
+    variants JSONB NOT NULL DEFAULT '{}'::jsonb, -- Opciones/variantes (ej. tamaño, peso, precio, stock)
     subscription_available BOOLEAN NOT NULL DEFAULT TRUE,
-    stock_quantity INTEGER NOT NULL DEFAULT 0 CHECK (stock_quantity >= 0),
     published_at TIMESTAMPTZ,
     is_active BOOLEAN NOT NULL DEFAULT TRUE,
     is_b2b_product BOOLEAN NOT NULL DEFAULT FALSE,
@@ -676,7 +676,6 @@ $$ LANGUAGE plpgsql SECURITY INVOKER;
 ```sql
 CREATE TYPE order_status AS ENUM ('pending', 'confirmed', 'processing', 'shipped', 'delivered', 'cancelled', 'refunded');
 CREATE TYPE payment_status AS ENUM ('pending', 'approved', 'rejected', 'cancelled', 'in_process', 'refunded', 'charged_back', 'in_mediation');
-CREATE TYPE payment_method AS ENUM ('credit_card', 'debit_card', 'yape', 'plin', 'bank_transfer');
 CREATE TYPE card_brand AS ENUM ('visa', 'mastercard', 'amex', 'diners', 'other');
 
 -- Direcciones de envío
@@ -728,7 +727,6 @@ CREATE TABLE orders (
     total NUMERIC(10, 2) NOT NULL CHECK (total >= 0),
     shipping_address JSONB NOT NULL DEFAULT '{}',
     billing_profile JSONB NOT NULL DEFAULT '{}', -- Snapshot inmutable de los datos de facturación al momento de la compra
-    payment_method payment_method NOT NULL,
     payment_status payment_status NOT NULL DEFAULT 'pending', -- 'pending', 'approved', 'rejected', 'cancelled', 'in_process', 'refunded', 'charged_back', 'in_mediation'
     transaction_id TEXT UNIQUE, -- ID final de la transacción bancaria
     checkout_id TEXT, -- Intención de pago o session ID de la pasarela
@@ -743,8 +741,8 @@ CREATE TABLE order_items (
     order_id BIGINT NOT NULL REFERENCES orders(id) ON DELETE CASCADE,
     product_id BIGINT REFERENCES products(id) ON DELETE SET NULL,
     product_name TEXT NOT NULL, -- Copia snapshot inmutable
-    sku TEXT NOT NULL, -- Copia snapshot inmutable
-    selected_variant JSONB NOT NULL DEFAULT '{}'::jsonb, -- Variante exacta que el usuario eligió al comprar
+    variant_sku TEXT NOT NULL, -- Copia snapshot inmutable
+    variant_attributes JSONB NOT NULL DEFAULT '{}'::jsonb, -- Atributos de la variante exacta que el usuario eligió al comprar
     quantity INTEGER NOT NULL CHECK (quantity > 0),
     unit_price NUMERIC(10, 2) NOT NULL CHECK (unit_price > 0),
     is_subscription BOOLEAN NOT NULL DEFAULT FALSE,
@@ -766,13 +764,13 @@ CREATE TABLE payment_tokens (
 -- Índice único: Solo 1 token de pago default por usuario
 CREATE UNIQUE INDEX idx_unique_tokens_default_per_user ON payment_tokens(profile_id) WHERE is_default = TRUE;
 
--- RPC: Crear orden completa (transacción multi-tabla)
 CREATE OR REPLACE FUNCTION create_order(
-    p_user_id UUID,
     p_cart_id BIGINT,
-    p_shipping_address_id BIGINT,
-    p_payment_method payment_method,
-    p_payment_token_id BIGINT DEFAULT NULL
+    p_shipping_address JSONB,
+    p_billing_profile JSONB,
+    p_contact_email TEXT,
+    p_profile_id BIGINT DEFAULT NULL,
+    p_checkout_id TEXT DEFAULT NULL
 ) RETURNS JSONB AS $$
     -- Transacción:
     -- 1. Crear orden + items
@@ -796,39 +794,43 @@ $$ LANGUAGE plpgsql SECURITY DEFINER;
 
 **Criterios de Aceptación:**
 
-- [ ] Listado de suscripciones activas del usuario
+- [ ] Listado de suscripciones activas, pausadas o canceladas del usuario
 - [ ] Card por suscripción: producto, cantidad, frecuencia, próximo cobro
-- [ ] Indicador de estado (activa, pausada, cancelada)
-- [ ] Acción: Pausar suscripción (máx 2 meses)
-- [ ] Acción: Reanudar suscripción pausada
-- [ ] Acción: Adelantar próximo envío
+- [ ] Indicador de estado (`active`, `paused`, `cancelled`, `past_due`/pago fallido)
+- [ ] Acción: Pausar suscripción activa (máx 2 meses)
+- [ ] Acción: Reanudar suscripción (desde `paused` con Catch-Up, `cancelled` bajo demanda o `past_due` con Reset de Ciclo para prevenir overstocking)
+- [ ] Acción: Adelantar o cambiar fecha del próximo envío
 - [ ] Acción: Cambiar frecuencia de entrega
-- [ ] Acción: Cambiar método de pago
-- [ ] Acción: Cancelar con encuesta de motivo
-- [ ] Historial de acciones realizadas sobre la suscripción
-- [ ] Timeline de envíos pasados y próximos
+- [ ] Acción: Cambiar método de pago y dirección de envío
+- [ ] Acción: Cancelar suscripción
+- [ ] Historial inmutable de acciones generadas automáticamente (ej. `created`, `paused`, `resumed`, `cancelled`, `reactivated`, `renewal`, `payment_failed`, `frequency_changed`)
 
 **Frontend:** `src/features/account/pages/SubscriptionsPage.tsx`
 
 **Supabase (`03_checkout_subscriptions`):**
 
 ```sql
-CREATE TYPE subscription_status AS ENUM ('active', 'paused', 'cancelled', 'expired');
-CREATE TYPE subscription_action AS ENUM ('created', 'paused', 'resumed', 'cancelled', 'frequency_changed', 'product_changed', 'address_changed', 'payment_changed', 'renewal');
+CREATE TYPE subscription_status AS ENUM ('active', 'paused', 'cancelled', 'past_due');
+CREATE TYPE subscription_action AS ENUM ('created', 'paused', 'resumed', 'cancelled', 'reactivated', 'renewal', 'payment_failed', 'frequency_changed', 'product_changed', 'address_changed', 'payment_changed');
 
 -- Suscripciones
 CREATE TABLE subscriptions (
     id BIGINT GENERATED BY DEFAULT AS IDENTITY PRIMARY KEY,
-    profile_id BIGINT REFERENCES profiles(id) ON DELETE SET NULL,
-    product_id BIGINT NOT NULL REFERENCES products(id) ON DELETE RESTRICT,
-    variant_info JSONB,
+    profile_id BIGINT REFERENCES profiles(id) ON DELETE CASCADE,
+    product_id BIGINT REFERENCES products(id) ON SET NULL,
+    product_name TEXT NOT NULL,
+    variant_sku TEXT NOT NULL,
+    variant_attributes JSONB NOT NULL DEFAULT '{}'::jsonb,
+    variant_price NUMERIC(10, 2) NOT NULL CHECK (variant_price > 0),
     quantity INTEGER NOT NULL DEFAULT 1 CHECK (quantity > 0),
     frequency_days INTEGER NOT NULL DEFAULT 30 CHECK (frequency_days > 0),
     status subscription_status NOT NULL DEFAULT 'active',
     next_billing_date TIMESTAMPTZ NOT NULL,
     shipping_address_id BIGINT NOT NULL REFERENCES shipping_addresses(id) ON DELETE RESTRICT,
+    billing_profile_id BIGINT NOT NULL REFERENCES billing_profiles(id) ON DELETE RESTRICT,
     payment_token_id BIGINT NOT NULL REFERENCES payment_tokens(id) ON DELETE RESTRICT,
     pause_until TIMESTAMPTZ,
+    cancel_reason TEXT,
     created_at TIMESTAMPTZ NOT NULL DEFAULT NOW(),
     updated_at TIMESTAMPTZ NOT NULL DEFAULT NOW()
 );
@@ -842,36 +844,35 @@ CREATE TABLE subscription_history (
     created_at TIMESTAMPTZ NOT NULL DEFAULT NOW()
 );
 
--- RPC: Pausar suscripción (máx 2 meses)
-CREATE OR REPLACE FUNCTION pause_subscription(
+-- 1. Controlador de Estado (Status: active, paused, cancelled, past_due)
+CREATE OR REPLACE FUNCTION manage_subscription_status(
     p_subscription_id BIGINT,
-    p_pause_days INTEGER DEFAULT 30
-) RETURNS JSONB AS $$
-    -- Valida: estado actual, días máx (60), actualiza status y pause_until
-    -- Retorna: { success, new_status, pause_until }
-$$ LANGUAGE plpgsql SECURITY DEFINER;
+    p_new_status subscription_status,
+    p_pause_days INTEGER DEFAULT NULL,
+    p_cancel_reason TEXT DEFAULT NULL,
+    p_charge_immediately BOOLEAN DEFAULT TRUE
+) RETURNS JSONB;
 
--- RPC: Reanudar suscripción
-CREATE OR REPLACE FUNCTION resume_subscription(p_subscription_id BIGINT)
-RETURNS JSONB AS $$
-    -- Retorna: { success, new_status, next_billing_date }
-$$ LANGUAGE plpgsql SECURITY DEFINER;
+-- 2. Trigger para Historial Automático (Registra configuración y estado automáticamente)
+CREATE TRIGGER trg_log_subscription_history
+AFTER INSERT OR UPDATE ON subscriptions
+FOR EACH ROW
+EXECUTE FUNCTION log_subscription_history();
 
--- RPC: Cancelar suscripción con motivo
-CREATE OR REPLACE FUNCTION cancel_subscription(
-    p_subscription_id BIGINT,
-    p_cancellation_reason TEXT
-) RETURNS JSONB AS $$
-    -- Registra acción en historial con motivo
-    -- Retorna: { success, cancelled_at }
-$$ LANGUAGE plpgsql SECURITY DEFINER;
+-- Datos Iniciales de Prueba (Suscripciones)
+-- Instrucción: Reemplazar {profile_id} con el ID generado en la tabla 'profiles'.
+INSERT INTO payment_tokens (profile_id, token_id, last_four, card_brand, is_default)
+VALUES ({profile_id}, 'tok_mock_123456789', '4242', 'visa', TRUE);
 
--- RPC: Adelantar próximo envío
-CREATE OR REPLACE FUNCTION advance_next_shipment(p_subscription_id BIGINT)
-RETURNS JSONB AS $$
-    -- Genera orden inmediata y ajusta next_billing_date
-    -- Retorna: { success, new_next_billing_date, order_id }
-$$ LANGUAGE plpgsql SECURITY DEFINER;
+INSERT INTO billing_profiles (profile_id, label, document_type, document_number, customer_name, fiscal_address, is_default)
+VALUES ({profile_id}, 'Boleta de Prueba', 'DNI', '12345678', 'Usuario de Pruebas', 'Av. Los Mockers 123, Lima', TRUE);
+
+INSERT INTO shipping_addresses (profile_id, label, recipient_name, phone, address_line1, district, province, department, is_default)
+VALUES ({profile_id}, 'Mi Casa de Pruebas', 'Usuario de Pruebas', '999999999', 'Av. Los Mockers 123', 'La Victoria', 'Lima', 'Lima', TRUE);
+
+-- Nota: Insertar la suscripción asegurándose de reemplazar los de abajo por los IDs correctos generados en las inserciones anteriores.
+INSERT INTO subscriptions (profile_id, product_id, product_name, variant_sku, variant_attributes, quantity, frequency_days, status, next_billing_date, shipping_address_id, billing_profile_id, payment_token_id) 
+VALUES ({profile_id}, 1, 'Receta Base (Mock)', 'SKU-MOCK-01', '{"peso": "500g"}'::jsonb, 1, 15, 'active', CURRENT_DATE + 15, {shipping_address_id}, {billing_profile_id}, {payment_token_id});
 ```
 
 ---
