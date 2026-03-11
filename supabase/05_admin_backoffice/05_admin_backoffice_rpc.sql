@@ -126,7 +126,7 @@ BEGIN
     WHERE id = p_product_id
     RETURNING stock_quantity INTO v_new_stock;
     
-    RETURN jsonb_build_object('success', true, 'new_stock', v_new_stock, 'movement_id', v_movement_id);
+    RETURN jsonb_build_object('new_stock', v_new_stock, 'movement_id', v_movement_id);
 END;
 $$ LANGUAGE plpgsql SECURITY DEFINER;
 

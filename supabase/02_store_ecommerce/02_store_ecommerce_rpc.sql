@@ -31,13 +31,15 @@ BEGIN
     -- 1. Obtener carrito
     SELECT * INTO v_cart FROM carts WHERE id = p_cart_id;
     IF v_cart IS NULL THEN
-        RETURN jsonb_build_object('error', 'Carrito no encontrado');
+        RAISE EXCEPTION 'Carrito no encontrado';
     END IF;
 
-    -- 2. Calcular subtotal
+    -- 2. Calcular subtotal (solo items seleccionados, por defecto true)
     FOR v_item IN SELECT * FROM jsonb_array_elements(v_cart.items)
     LOOP
-        v_subtotal := v_subtotal + ((v_item->>'price')::NUMERIC * (v_item->>'quantity')::INTEGER);
+        IF COALESCE((v_item->>'selected')::BOOLEAN, TRUE) = TRUE THEN
+            v_subtotal := v_subtotal + ((v_item->>'price')::NUMERIC * (v_item->>'quantity')::INTEGER);
+        END IF;
     END LOOP;
 
     -- 3. Calcular envío (si hay distrito)

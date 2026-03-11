@@ -23,24 +23,18 @@ BEGIN
     IF LENGTH(p_ruc) != 11 OR p_ruc !~ '^[0-9]+$' THEN
         RETURN jsonb_build_object(
             'success', false,
-            'error', 'RUC inválido: debe tener 11 dígitos numéricos'
+            'detail', 'RUC inválido: debe tener 11 dígitos numéricos'
         );
     END IF;
     
     -- Verificar si ya existe una solicitud para este usuario
     IF EXISTS (SELECT 1 FROM b2b_accounts WHERE profile_id = p_profile_id) THEN
-        RETURN jsonb_build_object(
-            'success', false,
-            'error', 'Ya existe una solicitud de cuenta B2B para este usuario'
-        );
+        RAISE EXCEPTION 'Ya existe una solicitud de cuenta B2B para este usuario';
     END IF;
     
     -- Verificar si el RUC ya está registrado
     IF EXISTS (SELECT 1 FROM b2b_accounts WHERE ruc = p_ruc) THEN
-        RETURN jsonb_build_object(
-            'success', false,
-            'error', 'Este RUC ya está registrado en el sistema'
-        );
+        RAISE EXCEPTION 'Este RUC ya está registrado en el sistema';
     END IF;
     
     -- Crear registro de cuenta B2B
@@ -66,10 +60,8 @@ BEGIN
     -- (Implementar con Supabase Edge Functions o trigger)
     
     RETURN jsonb_build_object(
-        'success', true,
         'account_id', v_account_id,
-        'status', 'pending',
-        'message', 'Solicitud enviada. Será revisada en las próximas 24-48 horas'
+        'status', 'pending'
     );
 END;
 $$ LANGUAGE plpgsql SECURITY DEFINER;
@@ -137,8 +129,7 @@ BEGIN
     IF v_account IS NULL THEN
         RETURN jsonb_build_object(
             'eligible', false,
-            'status', 'not_registered',
-            'message', 'No tiene cuenta profesional registrada'
+            'status', 'not_registered'
         );
     END IF;
     
@@ -153,21 +144,18 @@ BEGIN
     ELSIF v_account.status = 'pending' THEN
         RETURN jsonb_build_object(
             'eligible', false,
-            'status', 'pending',
-            'message', 'Su solicitud está en revisión'
+            'status', 'pending'
         );
     ELSIF v_account.status = 'rejected' THEN
         RETURN jsonb_build_object(
             'eligible', false,
             'status', 'rejected',
-            'message', 'Solicitud rechazada',
             'rejection_reason', v_account.rejection_reason
         );
     ELSE
         RETURN jsonb_build_object(
             'eligible', false,
-            'status', v_account.status,
-            'message', 'Cuenta suspendida o inactiva'
+            'status', v_account.status
         );
     END IF;
 END;
@@ -189,11 +177,11 @@ BEGIN
     SELECT * INTO v_account FROM b2b_accounts WHERE id = p_account_id;
     
     IF v_account IS NULL THEN
-        RETURN jsonb_build_object('success', false, 'error', 'Cuenta no encontrada');
+        RAISE EXCEPTION 'Cuenta no encontrada';
     END IF;
     
     IF v_account.status != 'pending' THEN
-        RETURN jsonb_build_object('success', false, 'error', 'Solo se pueden aprobar cuentas pendientes');
+        RAISE EXCEPTION 'Solo se pueden aprobar cuentas pendientes';
     END IF;
     
     -- Actualizar estado
@@ -212,11 +200,7 @@ BEGIN
     -- TODO: Enviar email de aprobación al usuario
     -- (Implementar con Supabase Edge Functions)
     
-    RETURN jsonb_build_object(
-        'success', true,
-        'account_id', p_account_id,
-        'message', 'Cuenta B2B aprobada exitosamente'
-    );
+    RETURN jsonb_build_object('account_id', p_account_id);
 END;
 $$ LANGUAGE plpgsql SECURITY DEFINER;
 
@@ -231,18 +215,18 @@ DECLARE
 BEGIN
     -- Validar motivo
     IF p_reason IS NULL OR TRIM(p_reason) = '' THEN
-        RETURN jsonb_build_object('success', false, 'error', 'Debe proporcionar un motivo de rechazo');
+        RAISE EXCEPTION 'Debe proporcionar un motivo de rechazo';
     END IF;
     
     -- Obtener cuenta
     SELECT * INTO v_account FROM b2b_accounts WHERE id = p_account_id;
     
     IF v_account IS NULL THEN
-        RETURN jsonb_build_object('success', false, 'error', 'Cuenta no encontrada');
+        RAISE EXCEPTION 'Cuenta no encontrada';
     END IF;
     
     IF v_account.status != 'pending' THEN
-        RETURN jsonb_build_object('success', false, 'error', 'Solo se pueden rechazar cuentas pendientes');
+        RAISE EXCEPTION 'Solo se pueden rechazar cuentas pendientes';
     END IF;
     
     -- Actualizar estado
@@ -256,11 +240,7 @@ BEGIN
     -- TODO: Enviar email de rechazo con motivo
     -- (Implementar con Supabase Edge Functions)
     
-    RETURN jsonb_build_object(
-        'success', true,
-        'account_id', p_account_id,
-        'message', 'Cuenta B2B rechazada'
-    );
+    RETURN jsonb_build_object('account_id', p_account_id);
 END;
 $$ LANGUAGE plpgsql SECURITY DEFINER;
 
@@ -278,18 +258,18 @@ BEGIN
     SELECT * INTO v_account FROM b2b_accounts WHERE id = p_account_id;
     
     IF v_account IS NULL THEN
-        RETURN jsonb_build_object('success', false, 'error', 'Cuenta no encontrada');
+        RAISE EXCEPTION 'Cuenta no encontrada';
     END IF;
     
     -- Determinar nuevo estado
     IF p_suspend THEN
         IF v_account.status != 'approved' THEN
-            RETURN jsonb_build_object('success', false, 'error', 'Solo se pueden suspender cuentas aprobadas');
+            RAISE EXCEPTION 'Solo se pueden suspender cuentas aprobadas';
         END IF;
         v_new_status := 'suspended';
     ELSE
         IF v_account.status != 'suspended' THEN
-            RETURN jsonb_build_object('success', false, 'error', 'Solo se pueden reactivar cuentas suspendidas');
+            RAISE EXCEPTION 'Solo se pueden reactivar cuentas suspendidas';
         END IF;
         v_new_status := 'approved';
     END IF;
@@ -311,13 +291,8 @@ BEGIN
     END IF;
     
     RETURN jsonb_build_object(
-        'success', true,
         'account_id', p_account_id,
-        'new_status', v_new_status,
-        'message', CASE 
-            WHEN p_suspend THEN 'Cuenta suspendida exitosamente'
-            ELSE 'Cuenta reactivada exitosamente'
-        END
+        'new_status', v_new_status
     );
 END;
 $$ LANGUAGE plpgsql SECURITY DEFINER;

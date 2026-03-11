@@ -94,7 +94,7 @@ BEGIN
     UPDATE notification_logs SET status = 'sent', sent_at = NOW()
     WHERE id = v_log_id;
     
-    RETURN jsonb_build_object('success', true, 'log_id', v_log_id);
+    RETURN jsonb_build_object('log_id', v_log_id);
 END;
 $$ LANGUAGE plpgsql SECURITY DEFINER;
 
