@@ -13,7 +13,7 @@
 4. [Legal y Compliance](#módulo-4-legal-y-compliance-perú)
 5. [Administración Back-office](#módulo-5-administración-back-office)
 6. [Módulos Complementarios](#módulo-6-complementarios)
-7. [Canal Profesional B2B](#módulo-7-canal-profesional-b2b)
+7. [Directorio Profesional](#módulo-7-directorio-profesional)
 
 ---
 
@@ -50,77 +50,185 @@ CREATE TABLE testimonials (
     owner_name TEXT NOT NULL,
     content TEXT NOT NULL,
     rating INTEGER NOT NULL CHECK (rating BETWEEN 1 AND 5),
-    is_featured BOOLEAN NOT NULL DEFAULT FALSE,
+    display_order INTEGER NOT NULL DEFAULT 0 CHECK (display_order >= 0),
+    is_active BOOLEAN NOT NULL DEFAULT TRUE,
     created_at TIMESTAMPTZ NOT NULL DEFAULT NOW()
 );
 
--- Configuración de Home Page (CMS Singleton)
+-- Tabla de configuracion del home
 CREATE TABLE home_page_config (
     id INTEGER PRIMARY KEY CHECK (id = 1),
+    
+    -- 1er Bloque: Atracción e Introducción
     hero_section JSONB NOT NULL DEFAULT '{}'::jsonb,
-    calculator_section JSONB NOT NULL DEFAULT '{}'::jsonb,
+    value_proposition_section JSONB NOT NULL DEFAULT '{}'::jsonb,
+    
+    -- 2do Bloque: Conversión y Producto (Dinámico por IDs)
+    featured_products_section JSONB NOT NULL DEFAULT '{}'::jsonb,
+    
+    -- 3er Bloque: Explicación y Confianza
     how_it_works_section JSONB NOT NULL DEFAULT '{}'::jsonb,
+    trust_section JSONB NOT NULL DEFAULT '{}'::jsonb,
+    sponsors_section JSONB NOT NULL DEFAULT '{}'::jsonb,
+    
+    -- 4to Bloque: Herramientas y Prueba Social (Dinámico por IDs)
+    calculator_section JSONB NOT NULL DEFAULT '{}'::jsonb,
     testimonials_section JSONB NOT NULL DEFAULT '{}'::jsonb,
+    
+    -- 5to Bloque: Cierre y Dudas (Dinámico por IDs)
     faq_section JSONB NOT NULL DEFAULT '{}'::jsonb,
     cta_banner_section JSONB NOT NULL DEFAULT '{}'::jsonb,
+    
     updated_at TIMESTAMPTZ NOT NULL DEFAULT NOW()
 );
 
+CREATE UNIQUE INDEX idx_blog_posts_single_main ON blog_posts (is_main) WHERE is_main = TRUE;
+
 -- Datos iniciales (Seed) para Testimonios
-INSERT INTO testimonials (pet_name, owner_name, content, rating, is_featured, pet_photo_url) VALUES 
-('Max', 'Carlos R.', 'Desde que Max come MasKot, su digestión mejoró increíblemente y tiene mucha más energía.', 5, TRUE, 'https://images.unsplash.com/photo-1543466835-00a7907e9de1?auto=format&fit=crop&q=80&w=200&h=200'),
-('Luna', 'Ana M.', 'El pelaje de Luna nunca ha estado tan brillante. Le encanta el sabor de la receta de pollo.', 5, TRUE, 'https://images.unsplash.com/photo-1517849845537-4d257902454a?auto=format&fit=crop&q=80&w=200&h=200'),
-('Rocky', 'Jorge L.', 'Batallábamos con alergias en la piel hasta que probamos MasKot. Es un cambio de vida total.', 5, TRUE, 'https://images.unsplash.com/photo-1537151608804-ea2f1cb0464f?auto=format&fit=crop&q=80&w=200&h=200');
+INSERT INTO testimonials (pet_name, owner_name, content, rating, pet_photo_url) VALUES 
+('Max', 'Carlos R.', 'Desde que Max come MasKot, su digestión mejoró increíblemente y tiene mucha más energía.', 5, 'https://images.unsplash.com/photo-1543466835-00a7907e9de1?auto=format&fit=crop&q=80&w=200&h=200'),
+('Luna', 'Ana M.', 'El pelaje de Luna nunca ha estado tan brillante. Le encanta el sabor de la receta de pollo.', 5, 'https://images.unsplash.com/photo-1517849845537-4d257902454a?auto=format&fit=crop&q=80&w=200&h=200'),
+('Rocky', 'Jorge L.', 'Batallábamos con alergias en la piel hasta que probamos MasKot. Es un cambio de vida total.', 5, 'https://images.unsplash.com/photo-1537151608804-ea2f1cb0464f?auto=format&fit=crop&q=80&w=200&h=200');
 
 -- Datos iniciales (Seed) para la Home Page
-INSERT INTO home_page_config (id, hero_section, calculator_section, how_it_works_section, testimonials_section, faq_section, cta_banner_section) VALUES (
+INSERT INTO home_page_config (
+    id, 
+    hero_section, 
+    value_proposition_section, 
+    featured_products_section, 
+    how_it_works_section, 
+    trust_section, 
+    sponsors_section, 
+    calculator_section, 
+    testimonials_section, 
+    faq_section, 
+    cta_banner_section
+) VALUES (
     1,
-    '{
-      "title": "Nutrición natural y personalizada para tu mascota",
-      "subtitle": "Comida de verdad, hecha con ingredientes frescos y aprobada por veterinarios. Dale a tu mejor amigo la vida que merece.",
-      "cta_text": "Descubre tu plan ideal",
-      "cta_link": "/calculator",
-      "image_url": "/images/home/hero-dog.jpg"
-    }'::jsonb,
-    '{
-      "title": "¿Cuánto cuesta alimentar bien a tu mascota?",
-      "description": "Compara el costo de la comida tradicional vs MasKot. Prevenimos enfermedades a largo plazo con nutrición preventiva."
-    }'::jsonb,
-    '{
-      "title": "Cómo funciona MasKot",
-      "steps": [
-        {
-          "icon": "clipboard",
-          "title": "1. Cuéntanos sobre tu mascota",
-          "description": "Completa un breve perfil con su peso, edad y nivel de actividad."
-        },
-        {
-          "icon": "heart",
-          "title": "2. Recibe tu plan ideal",
-          "description": "Calculamos las porciones exactas que necesita para estar saludable."
-        },
-        {
-          "icon": "truck",
-          "title": "3. Entrega a domicilio",
-          "description": "Recibe comida fresca en la puerta de tu casa con la frecuencia que elijas."
-        }
-      ]
-    }'::jsonb,
-    '{
-      "title": "Mascotas felices,",
-      "highlight_title": "familias tranquilas",
-      "description": "No lo decimos nosotros, lo dicen cientos de perros y gatos que ya cambiaron su vida (y su salud) con MasKot."
-    }'::jsonb,
-    '{
-      "title": "Preguntas Frecuentes",
-      "description": "Resolvemos tus principales dudas sobre salud, envíos y pagos."
-    }'::jsonb,
-    '{
-      "title": "¿Listo para el cambio?",
-      "subtitle": "Únete a la revolución de la comida fresca para mascotas.",
-      "cta_text": "Ver productos",
-      "cta_link": "/store"
-    }'::jsonb
+    
+    -- [SECCIÓN 1] HERO: Lo primero que ve el usuario (Captura 1 Superior)
+    $$
+    {
+        "title": "Alimentación premium para tu perro, en un plan mensual a su medida.",
+        "subtitle": "Elige su receta ideal y recíbela en casa con continuidad.",
+        "cta_text": "Ver Tienda",
+        "cta_link": "/store",
+        "hero_images": [
+            "https://images.unsplash.com/photo-1548199973-03cce0bbc87b?auto=format&fit=crop&w=900&q=80",
+            "https://images.unsplash.com/photo-1583511655857-d19b40a7a54e?auto=format&fit=crop&w=900&q=80",
+            "https://images.unsplash.com/photo-1517849845537-4d257902454a?auto=format&fit=crop&w=900&q=80",
+            "https://images.unsplash.com/photo-1601758124510-52d02ddb7cbd?auto=format&fit=crop&w=900&q=80"
+        ]
+    }
+    $$::jsonb,
+
+    -- [SECCIÓN 2] VALUE PROPOSITION: Enganche rápido (Captura 1 Inferior)
+    $$
+    {
+        "title": "¿Qué ganas con +Kot desde el primer mes?",
+        "subtitle": "Alimentarlo bien no debería ser complicado. +Kot te ayuda a tomar una decisión segura y práctica.",
+        "image_url": "https://images.unsplash.com/photo-1601758124510-52d02ddb7cbd?auto=format&fit=crop&w=1200&q=80",
+        "benefits": [
+            "Recibes la cantidad justa para su consumo mensual, sin comprar de más o quedarte corto.",
+            "Mantienes continuidad y control: eliges y luego ajustas según su rutina real.",
+            "Ganas tranquilidad: claridad en lo que le das y un proceso simple de inicio a entrega."
+        ]
+    }
+    $$::jsonb,
+
+    -- [SECCIÓN 3] FEATURED PRODUCTS: Dinámico (IDs) - (Captura 2)
+    -- El frontend iterará sobre product_ids, hará fetch a la tabla products y renderizará la comparativa de compra.
+    $$
+    {
+        "title": "¿Por qué elegir este producto para tu perro?",
+        "subtitle": "Un producto premium pensado para el día a día. Desliza para ver más opciones.",
+        "product_ids": [1, 2, 3]
+    }
+    $$::jsonb,
+
+    -- [SECCIÓN 4] HOW IT WORKS: Reduce fricción (Captura 3 Superior)
+    $$
+    {
+        "title": "¿Cómo funciona la suscripción paso a paso?",
+        "steps": [
+            { "step_number": "01", "description": "Calculas el plan ideal con datos simples.", "image_url": "https://images.unsplash.com/photo-1558788353-f76d92427f16?auto=format&fit=crop&w=800&q=80" },
+            { "step_number": "02", "description": "Eliges la receta y confirmas tu plan mensual.", "image_url": "https://images.unsplash.com/photo-1583512603805-3cc6b41f3edb?auto=format&fit=crop&w=800&q=80" },
+            { "step_number": "03", "description": "Pagas y coordinamos la entrega.", "image_url": "https://images.unsplash.com/photo-1450778869180-41d0601e046e?auto=format&fit=crop&w=800&q=80" },
+            { "step_number": "04", "description": "Recibes en casa y ajustas tu plan cuando sea necesario.", "image_url": "https://images.unsplash.com/photo-1576201836106-db1758fd1c97?auto=format&fit=crop&w=800&q=80" }
+        ]
+    }
+    $$::jsonb,
+
+    -- [SECCIÓN 5] TRUST: Garantías antes del pago (Captura 3 Inferior)
+    $$
+    {
+        "title": "¿Por qué puedes confiar en +Kot?",
+        "image_url": "https://images.unsplash.com/photo-1535930749574-1399327ce78f?auto=format&fit=crop&w=1200&q=80",
+        "reasons": [
+            { "number": "01", "title": "Transparencia en lo que compras", "description": "Queremos que tengas claridad desde el inicio: qué incluye tu plan, qué estás dando y por qué se recomienda." },
+            { "number": "02", "title": "Continuidad sin fricción", "description": "La suscripción existe para hacerlo fácil. Recibes con continuidad y mantienes el control del proceso." },
+            { "number": "03", "title": "Un plan que evoluciona con tu perro", "description": "Los perros cambian, y su alimentación también. Si cambia su rutina, tu plan puede ajustarse." }
+        ]
+    }
+    $$::jsonb,
+
+    -- [SECCIÓN 6] SPONSORS: Autoridad de marca
+    $$
+    {
+        "title": "Respaldados por",
+        "organizations": [
+            {
+                "name": "Startup Perú 12G",
+                "logo_url": "https://ruta-startup.com/wp-content/uploads/2023/06/763d8-6e192791-3825-4aef-9574-4f9407f058ba-1-1.png"
+            },
+            {
+                "name": "Santander X",
+                "logo_url": "https://explorerbyx.org/assets/icons/sx_explorer-logo-vector.svg"
+            },
+            {
+                "name": "Incubagraria",
+                "logo_url": "https://incubagraria.lamolina.edu.pe/wp-content/uploads/2025/08/LOGO-INCUBAGRARIA.png"
+            }
+        ]
+    }
+    $$::jsonb,
+
+    -- [SECCIÓN 7] CALCULATOR: Interacción
+    $$
+    {
+        "title": "¿Cuánto cuesta alimentar bien a tu mascota?",
+        "description": "Compara el costo de la comida tradicional vs +Kot. Prevenimos enfermedades a largo plazo con nutrición preventiva."
+    }
+    $$::jsonb,
+
+    -- [SECCIÓN 8] TESTIMONIALS: Dinámico (IDs) - Prueba social final
+    $$
+    {
+        "title": "Mascotas felices,",
+        "highlight_title": "familias tranquilas",
+        "description": "No lo decimos nosotros, lo dicen cientos de perros y gatos que ya cambiaron su vida con +Kot."
+    }
+    $$::jsonb,
+
+    -- [SECCIÓN 9] FAQS: Dinámico (IDs) - Ataja objeciones (Captura 4 Superior)
+    $$
+    {
+        "title": "Preguntas frecuentes",
+        "description": "Resolvemos tus principales dudas sobre la suscripción y envíos.",
+        "faq_ids": [10, 20, 40, 60] 
+    }
+    $$::jsonb,
+
+    -- [SECCIÓN 10] CTA FINAL: Última oportunidad de conversión (Captura 4 Inferior)
+    $$
+    {
+        "title": "Descubre el plan perfecto para tu perro",
+        "subtitle": "Explora nuestros productos premium y elige el plan mensual que mejor se adapte a tu mascota.",
+        "cta_text": "Ver Tienda",
+        "cta_link": "/store",
+        "image_url": "https://images.unsplash.com/photo-1601758174114-e711c0cbaa69?auto=format&fit=crop&w=1200&q=80"
+    }
+    $$::jsonb
 );
 
 -- RPC: Calculadora Nutricional Definitiva con Fórmula RER Veterinaria
@@ -167,7 +275,8 @@ CREATE TABLE team_members (
     photo_url TEXT,
     bio TEXT,
     linkedin_url TEXT,
-    display_order INTEGER NOT NULL DEFAULT 0 CHECK (display_order >= 0)
+    display_order INTEGER NOT NULL DEFAULT 0 CHECK (display_order >= 0),
+    is_active BOOLEAN NOT NULL DEFAULT TRUE
 );
 
 -- Configuración de Página "Nosotros"
@@ -221,18 +330,18 @@ INSERT INTO about_page_config (id, hero_section, mission_vision_section, timelin
       ]
     }'::jsonb,
     '{
-      "title": "Conoce al Equipo",
-      "subtitle": "Personas apasionadas detrás de la felicidad de tu mascota."
+        "title": "Conoce al Equipo",
+        "subtitle": "Personas apasionadas detrás de la felicidad de tu mascota."
     }'::jsonb,
     '{
-      "title": "Nuestras Certificaciones",
-      "subtitle": "Calidad y seguridad comprobada."
+        "title": "Nuestras Certificaciones",
+        "subtitle": "Calidad y seguridad comprobada."
     }'::jsonb,
     '{
-      "title": "¿Convencido de la comida real?",
-      "subtitle": "Tu mascota merece saber qué se siente comer ingredientes frescos cada día.",
-      "cta_text": "Ver Planes",
-      "cta_link": "/calculator"
+        "title": "¿Convencido de la comida real?",
+        "subtitle": "Tu mascota merece saber qué se siente comer ingredientes frescos cada día.",
+        "cta_text": "Ver Planes",
+        "cta_link": "/store"
     }'::jsonb
 );
 ```
@@ -270,7 +379,6 @@ CREATE TABLE faqs (
     category_id BIGINT REFERENCES faq_categories(id) ON DELETE SET NULL,
     question TEXT NOT NULL,
     answer TEXT NOT NULL,
-    is_featured BOOLEAN NOT NULL DEFAULT FALSE,
     display_order INTEGER NOT NULL DEFAULT 0 CHECK (display_order >= 0),
     created_at TIMESTAMPTZ NOT NULL DEFAULT NOW(),
     updated_at TIMESTAMPTZ NOT NULL DEFAULT NOW()
@@ -282,14 +390,14 @@ INSERT INTO faq_categories (id, name, slug, display_order) VALUES
 (2, 'Suscripción y Pagos', 'suscripcion-pagos', 20),
 (3, 'Envíos y Entregas', 'envios-entregas', 30);
 
-INSERT INTO faqs (category_id, question, answer, is_featured, display_order) VALUES
-(1, '¿Los ingredientes son aptos para consumo humano?', 'Sí. Todos nuestros ingredientes provienen de proveedores certificados para consumo humano (grado humano). No usamos descartes, harinas ni conservantes.', TRUE, 10),
-(1, '¿Tengo que cocinar la comida cuando me llegue?', '¡No! Las raciones de MasKot ya vienen cocinadas al vapor a bajas temperaturas para mantener los nutrientes y listas para servir.', TRUE, 20),
-(1, '¿Debería hacer una transición gradual?', 'Sí, recomendamos una transición de 7 a 10 días mezclando MasKot gradualmente con el alimento actual para evitar malestares estomacales.', FALSE, 30),
-(2, '¿Puedo cancelar o pausar mi suscripción?', 'Absolutamente. Tienes control total desde tu panel de usuario para pausar, adelantar pedidos o cancelar en cualquier momento sin penalizaciones.', TRUE, 40),
-(2, '¿Cuándo me cobran?', 'El cobro se realiza automáticamente a tu tarjeta de crédito o débito 24 horas antes de procesar tu siguiente envío.', FALSE, 50),
-(3, '¿Cómo llega la comida?', 'Enviamos nuestra comida en cajas térmicas especiales que la mantienen congelada o refrigerada hasta llegar a la puerta de tu casa.', TRUE, 60),
-(3, '¿Hacen envíos a todo el país?', 'Actualmente llegamos a toda Lima Metropolitana y provincias seleccionadas. Ingresa tu código postal en el checkout para confirmar cobertura.', FALSE, 70);
+INSERT INTO faqs (category_id, question, answer, display_order) VALUES
+(1, '¿Los ingredientes son aptos para consumo humano?', 'Sí. Todos nuestros ingredientes provienen de proveedores certificados para consumo humano (grado humano). No usamos descartes, harinas ni conservantes.', 10),
+(1, '¿Tengo que cocinar la comida cuando me llegue?', '¡No! Las raciones de MasKot ya vienen cocinadas al vapor a bajas temperaturas para mantener los nutrientes y listas para servir.', 20),
+(1, '¿Debería hacer una transición gradual?', 'Sí, recomendamos una transición de 7 a 10 días mezclando MasKot gradualmente con el alimento actual para evitar malestares estomacales.', 30),
+(2, '¿Puedo cancelar o pausar mi suscripción?', 'Absolutamente. Tienes control total desde tu panel de usuario para pausar, adelantar pedidos o cancelar en cualquier momento sin penalizaciones.', 40),
+(2, '¿Cuándo me cobran?', 'El cobro se realiza automáticamente a tu tarjeta de crédito o débito 24 horas antes de procesar tu siguiente envío.', 50),
+(3, '¿Cómo llega la comida?', 'Enviamos nuestra comida en cajas térmicas especiales que la mantienen congelada o refrigerada hasta llegar a la puerta de tu casa.', 60),
+(3, '¿Hacen envíos a todo el país?', 'Actualmente llegamos a toda Lima Metropolitana y provincias seleccionadas. Ingresa tu código postal en el checkout para confirmar cobertura.', 70);
 ```
 
 ---
@@ -336,7 +444,7 @@ CREATE TABLE blog_posts (
     category_id BIGINT REFERENCES blog_categories(id) ON DELETE SET NULL,
     author_id BIGINT REFERENCES profiles(id) ON DELETE SET NULL,
     read_time_minutes INTEGER NOT NULL DEFAULT 5 CHECK (read_time_minutes > 0),
-    is_featured BOOLEAN NOT NULL DEFAULT FALSE,
+    is_main BOOLEAN NOT NULL DEFAULT FALSE,
     meta_title TEXT,
     meta_description TEXT,
     published_at TIMESTAMPTZ,
@@ -350,10 +458,32 @@ INSERT INTO blog_categories (id, name, slug, display_order) VALUES
 (2, 'Salud Preventiva', 'salud-preventiva', 20),
 (3, 'Comportamiento', 'comportamiento', 30);
 
-INSERT INTO blog_posts (slug, title, description, content, featured_image_url, category_id, read_time_minutes, is_featured, published_at) VALUES
-('5-mitos-sobre-croquetas', '5 Mitos sobre las croquetas que la industria no quiere que sepas', 'Descubre la verdad detrás de las bolitas marrones y por qué la comida fresca es superior.', '<p>Las croquetas comerciales han sido la norma durante décadas, pero...</p>', 'https://images.unsplash.com/photo-1583337130417-3346a1be7dee?auto=format&fit=crop&q=80&w=800&h=400', 1, 5, TRUE, NOW()),
-('guia-transicion-comida-natural', 'Guía paso a paso para la transición a comida natural', 'El cambio de dieta debe ser gradual. Sigue estos 4 pasos para cuidar la digestión de tu mascota.', '<p>Cambiar drásticamente la dieta de tu perro o gato puede causar malestar estomacal...</p>', 'https://images.unsplash.com/photo-1514888286974-6c03e2ca1dba?auto=format&fit=crop&q=80&w=800&h=400', 1, 7, FALSE, NOW()),
-('beneficios-omega-3', 'Los increíbles beneficios del Omega 3 en perros mayores', 'Previene el deterioro cognitivo y mejora la movilidad articular con este ácido graso esencial.', '<p>El Omega 3 es un componente crucial en la dieta de mascotas de edad avanzada...</p>', 'https://images.unsplash.com/photo-1537151608804-ea2f1cb0464f?auto=format&fit=crop&q=80&w=800&h=400', 2, 4, FALSE, NOW());
+INSERT INTO blog_posts (slug, title, description, content, featured_image_url, category_id, read_time_minutes, is_main, published_at) VALUES
+('5-mitos-sobre-croquetas', '5 Mitos sobre las croquetas que la industria no quiere que sepas', 'Descubre la verdad detrás de las bolitas marrones y por qué la comida fresca es superior.', $$Las croquetas comerciales han sido la norma durante décadas, pero hay puntos que vale la pena revisar.
+
+## Lo que debes saber
+- La lista de ingredientes cuenta la historia completa.
+- Menos ultraprocesados significa mejor digestion.
+- La hidratacion importa tanto como la proteina.
+
+**Conclusión:** elegir comida real cambia la energia, el pelaje y la salud intestinal.$$ , 'https://images.unsplash.com/photo-1583337130417-3346a1be7dee?auto=format&fit=crop&q=80&w=800&h=400', 1, 5, TRUE, NOW()),
+('guia-transicion-comida-natural', 'Guía paso a paso para la transición a comida natural', 'El cambio de dieta debe ser gradual. Sigue estos 4 pasos para cuidar la digestión de tu mascota.', $$Cambiar la dieta de tu perro o gato requiere paciencia.
+
+## Pasos recomendados
+1. **Dia 1-2:** 75% comida actual + 25% MasKot.
+2. **Dia 3-4:** 50% + 50%.
+3. **Dia 5-6:** 25% + 75%.
+4. **Dia 7:** 100% MasKot.
+
+Si notas sensibilidad, mantén un paso extra antes de avanzar.$$ , 'https://images.unsplash.com/photo-1514888286974-6c03e2ca1dba?auto=format&fit=crop&q=80&w=800&h=400', 1, 7, FALSE, NOW()),
+('beneficios-omega-3', 'Los increíbles beneficios del Omega 3 en perros mayores', 'Previene el deterioro cognitivo y mejora la movilidad articular con este ácido graso esencial.', $$El Omega 3 es clave para mantener activos a los perros senior.
+
+## Beneficios principales
+- Apoya la movilidad y reduce inflamacion articular.
+- Favorece la salud cognitiva.
+- Mejora el brillo del pelaje.
+
+**Tip:** busca fuentes de calidad como aceite de salmon salvaje.$$ , 'https://images.unsplash.com/photo-1537151608804-ea2f1cb0464f?auto=format&fit=crop&q=80&w=800&h=400', 2, 4, FALSE, NOW());
 ```
 
 ---
@@ -399,10 +529,10 @@ CREATE TABLE products (
     category_id BIGINT REFERENCES product_categories(id) ON DELETE SET NULL,
     variants JSONB NOT NULL DEFAULT '{}'::jsonb, -- Opciones/variantes (ej. tamaño, peso, precio, stock)
     subscription_available BOOLEAN NOT NULL DEFAULT TRUE,
-    published_at TIMESTAMPTZ,
-    is_active BOOLEAN NOT NULL DEFAULT TRUE,
-    is_b2b_product BOOLEAN NOT NULL DEFAULT FALSE,
-    b2b_price NUMERIC(10, 2) CHECK (b2b_price > 0),
+    published_at TIMESTAMPTZ, -- auto set when product is activated the first time
+    is_active BOOLEAN NOT NULL DEFAULT FALSE,
+    is_professional_product BOOLEAN NOT NULL DEFAULT FALSE,
+    professional_discount_pct INTEGER DEFAULT 0 CHECK (professional_discount_pct BETWEEN 0 AND 100),
     created_at TIMESTAMPTZ NOT NULL DEFAULT NOW(),
     updated_at TIMESTAMPTZ NOT NULL DEFAULT NOW()
 );
@@ -433,19 +563,41 @@ INSERT INTO products (
     images, category_id, variants, subscription_available, 
     stock_quantity, published_at, is_active
 ) VALUES
-('Receta Res y Verduras (Seco)', 'receta-res-verduras-seco', '<p>Alimento horneado lentamente, alto en proteínas.</p>', 'Proteína de calidad para perritos activos.', 25.00, 30.00, 
+('Receta Res y Verduras (Seco)', 'receta-res-verduras-seco', $$Alimento horneado lentamente, alto en proteínas.
+
+**Beneficios principales**
+- Proteina animal para energia diaria.
+- Verduras reales para fibra y digestion suave.
+- Coccion lenta para conservar nutrientes.
+
+**Ideal para** perros activos y rutinas exigentes.$$ , 'Proteína de calidad para perritos activos.', 25.00, 30.00, 
     '{"https://images.unsplash.com/photo-1583337130417-3346a1be7dee?auto=format&fit=crop&q=80&w=600&h=600"}', 1, 
     '[{"sku": "DRY-001-2A", "attributes": {"Peso": "2kg", "Tipo": "Adulto"}, "price": 25.00, "stock": 50}, {"sku": "DRY-001-2C", "attributes": {"Peso": "2kg", "Tipo": "Cachorro"}, "price": 28.00, "stock": 50}, {"sku": "DRY-001-5A", "attributes": {"Peso": "5kg", "Tipo": "Adulto"}, "price": 55.00, "stock": 50}]'::jsonb, true, 100, NOW(), true),
 
-('Pate de Pollo Orgánico', 'pate-pollo-organico', '<p>Libre de granos, ideal para estómagos sensibles.</p>', 'Pate premium sin conservantes.', 5.50, NULL, 
+('Pate de Pollo Orgánico', 'pate-pollo-organico', $$Libre de granos, ideal para estomagos sensibles.
+
+**Beneficios principales**
+- Pollo real como primer ingrediente.
+- Textura suave para perros y gatos delicados.
+- Coccion al vapor que conserva el sabor.$$ , 'Pate premium sin conservantes.', 5.50, NULL, 
     '{"https://images.unsplash.com/photo-1583336829158-9419b456108b?auto=format&fit=crop&q=80&w=600&h=600"}', 2, 
     '[{"sku": "WET-001-400", "attributes": {"Peso": "400g"}, "price": 5.50, "stock": 200}]'::jsonb, true, 200, NOW(), true),
 
-('Tiras de Lomo Deshidratado', 'tiras-lomo-deshidratado', '<p>100% res deshidratada a baja temperatura.</p>', 'El premio perfecto para entrenamiento.', 12.00, 15.00, 
+('Tiras de Lomo Deshidratado', 'tiras-lomo-deshidratado', $$100% res deshidratada a baja temperatura.
+
+**Beneficios principales**
+- Alto en proteina para energia inmediata.
+- Textura firme que ayuda a la masticacion.
+- Sin aditivos ni conservantes.$$ , 'El premio perfecto para entrenamiento.', 12.00, 15.00, 
     '{"https://images.unsplash.com/photo-1541781774459-bb2af2f05b55?auto=format&fit=crop&q=80&w=600&h=600"}', 3, 
     '[{"sku": "SNC-001-200", "attributes": {"Peso": "200g"}, "price": 12.00, "stock": 50}]'::jsonb, false, 50, NOW(), true),
 
-('Aceite de Salmón Salvaje', 'aceite-salmon-salvaje', '<p>Rico en Omega 3 y 6 para piel y pelaje brillantes.</p>', 'Shot de brillo para el pelaje.', 22.00, NULL, 
+('Aceite de Salmón Salvaje', 'aceite-salmon-salvaje', $$Rico en Omega 3 y 6 para piel y pelaje brillantes.
+
+**Beneficios principales**
+- Ayuda a reducir inflamacion.
+- Aporta brillo visible al pelaje.
+- Apoya la salud cognitiva en perros adultos.$$ , 'Shot de brillo para el pelaje.', 22.00, NULL, 
     '{"https://images.unsplash.com/photo-1517849845537-4d257902454a?auto=format&fit=crop&q=80&w=600&h=600"}', 4, 
     '[{"sku": "SUP-001-250", "attributes": {"Volumen": "250ml"}, "price": 22.00, "stock": 30}]'::jsonb, true, 30, NOW(), true);
 
@@ -598,7 +750,7 @@ CREATE TABLE coupons (
     used_count INTEGER NOT NULL DEFAULT 0 CHECK (used_count >= 0),
     valid_from TIMESTAMPTZ NOT NULL DEFAULT NOW(),
     valid_until TIMESTAMPTZ,
-    is_active BOOLEAN NOT NULL DEFAULT TRUE
+    is_active BOOLEAN NOT NULL DEFAULT FALSE
 );
 
 -- Carritos
@@ -757,7 +909,8 @@ CREATE TABLE order_items (
 CREATE TABLE payment_tokens (
     id BIGINT GENERATED BY DEFAULT AS IDENTITY PRIMARY KEY,
     profile_id BIGINT NOT NULL REFERENCES profiles(id) ON DELETE CASCADE,
-    token_id TEXT NOT NULL, -- Ej: tok_928374823je (MercadoPago Token)
+    token_id TEXT NOT NULL,        -- MP card ID (ej: 1773089741151)
+    customer_id TEXT NOT NULL,     -- ID del customer en la pasarela de pago — requerido para generar tokens MIT en cobros futuros
     last_four TEXT NOT NULL,
     card_brand card_brand NOT NULL,
     expires_at TIMESTAMPTZ,
@@ -962,19 +1115,20 @@ INSERT INTO content_pages (slug, title, content, is_active, published_at) VALUES
     'privacy-policy', 
     'Política de Privacidad', 
     $$
-    <p>El presente documento describe los tratamientos de datos personales que llevamos a cabo en MasKot. Su privacidad es de suma importancia para nosotros, y estamos comprometidos con la transparencia.</p>
-    <h2>1. Finalidad del Tratamiento</h2>
-    <p>Recopilamos su información con las siguientes finalidades secundarias e inherentes a la prestación de nuestros servicios:</p>
-    <ul>
-        <li>Procesar sus <strong>órdenes de compra</strong> y suscripciones recurrentes de manera segura.</li>
-        <li>Enviar actualizaciones sobre el estado de su envío a través de correo electrónico o teléfono celular.</li>
-        <li>Atender dudas, reclamos y sugerencias a través del Libro de Reclamaciones Virtual.</li>
-    </ul>
-    <h3>1.1 Base de Datos</h3>
-    <p>Sus datos son almacenados en un servidor seguro en la nube. Puede consultar más detalles ingresando <a href="/nosotros">aquí</a>.</p>
-    
-    <h2>2. Transferencia a Terceros</h2>
-    <p>MasKot S.A.C. compartirá los datos mínimos necesarios, como nombre y dirección, estrictamente con nuestros proveedores logísticos para cumplir con las rutas de despacho (última milla).</p>
+El presente documento describe los tratamientos de datos personales que llevamos a cabo en MasKot. Su privacidad es de suma importancia para nosotros, y estamos comprometidos con la transparencia.
+
+## 1. Finalidad del Tratamiento
+Recopilamos su información con las siguientes finalidades secundarias e inherentes a la prestación de nuestros servicios:
+
+- Procesar sus **órdenes de compra** y suscripciones recurrentes de manera segura.
+- Enviar actualizaciones sobre el estado de su envío a través de correo electrónico o teléfono celular.
+- Atender dudas, reclamos y sugerencias a través del Libro de Reclamaciones Virtual.
+
+### 1.1 Base de Datos
+Sus datos son almacenados en un servidor seguro en la nube. Puede consultar más detalles ingresando [aquí](/nosotros).
+
+## 2. Transferencia a Terceros
+MasKot S.A.C. compartirá los datos mínimos necesarios, como nombre y dirección, estrictamente con nuestros proveedores logísticos para cumplir con las rutas de despacho (última milla).
     $$, 
     true, 
     NOW()
@@ -983,18 +1137,17 @@ INSERT INTO content_pages (slug, title, content, is_active, published_at) VALUES
     'terms-conditions', 
     'Términos y Condiciones', 
     $$
-    <p>Bienvenido a MasKot. Los siguientes términos y condiciones regulan el uso de este sitio web y establecen la relación comercial vigente entre usted (el usuario) y nosotros.</p>
-    <h2>1. Condiciones Generales</h2>
-    <p>El uso continuo de esta plataforma digital constituye su aceptación expresa de estos términos. <strong>Si no está de acuerdo, por favor absténgase de usar el portal.</strong></p>
-    <blockquote>
-        "Nuestra misión es cuidar la salud de tu mascota de forma transparente y predecible."
-    </blockquote>
-    <h2>2. Políticas de Facturación</h2>
-    <ol>
-        <li>Todos los precios mostrados incluyen IGV.</li>
-        <li>En el caso de las suscripciones, se realizará un cargo automático según la frecuencia que usted seleccione.</li>
-        <li>Los comprobantes de pago (Boleta/Factura) se emiten automáticamente tras confirmarse el abono.</li>
-    </ol>
+Bienvenido a MasKot. Los siguientes términos y condiciones regulan el uso de este sitio web y establecen la relación comercial vigente entre usted (el usuario) y nosotros.
+
+## 1. Condiciones Generales
+El uso continuo de esta plataforma digital constituye su aceptación expresa de estos términos. **Si no está de acuerdo, por favor absténgase de usar el portal.**
+
+> "Nuestra misión es cuidar la salud de tu mascota de forma transparente y predecible."
+
+## 2. Políticas de Facturación
+1. Todos los precios mostrados incluyen IGV.
+2. En el caso de las suscripciones, se realizará un cargo automático según la frecuencia que usted seleccione.
+3. Los comprobantes de pago (Boleta/Factura) se emiten automáticamente tras confirmarse el abono.
     $$, 
     true, 
     NOW()
@@ -1003,15 +1156,15 @@ INSERT INTO content_pages (slug, title, content, is_active, published_at) VALUES
     'returns-policy', 
     'Política de Devoluciones', 
     $$
-    <p>En MasKot garantizamos la calidad de nuestros productos. Si recibe un artículo defectuoso o incorrecto, nuestro equipo lo resolverá a la brevedad posible.</p>
-    <h2>1. Requisitos para la Devolución</h2>
-    <ul>
-        <li>El producto debe de mantenerse <strong>sellado y en su empaque original</strong>.</li>
-        <li>Debe realizar el reclamo en un plazo máximo de <em>7 días calendario posteriores a la recepción</em> del pedido.</li>
-        <li>Adjuntar el comprobante de pago electrónico.</li>
-    </ul>
-    <h2>2. Proceso de Cambio</h2>
-    <p>Para iniciar el proceso, comuníquese con nuestro equipo de soporte enviando fotografías legibles del inconveniente. Luego procesaremos una orden de recojo a domicilio sin costo adicional, siempre que el error sea logístico.</p>
+En MasKot garantizamos la calidad de nuestros productos. Si recibe un artículo defectuoso o incorrecto, nuestro equipo lo resolverá a la brevedad posible.
+
+## 1. Requisitos para la Devolución
+- El producto debe de mantenerse **sellado y en su empaque original**.
+- Debe realizar el reclamo en un plazo máximo de *7 días calendario posteriores a la recepción* del pedido.
+- Adjuntar el comprobante de pago electrónico.
+
+## 2. Proceso de Cambio
+Para iniciar el proceso, comuníquese con nuestro equipo de soporte enviando fotografías legibles del inconveniente. Luego procesaremos una orden de recojo a domicilio sin costo adicional, siempre que el error sea logístico.
     $$, 
     true, 
     NOW()
@@ -1020,16 +1173,17 @@ INSERT INTO content_pages (slug, title, content, is_active, published_at) VALUES
     'shipping-policy', 
     'Política de Envíos', 
     $$
-    <p>Nuestra prioridad es que el alimento de tu mascota llegue a tiempo. Para lograrlo, mantenemos una política de despachos centralizada.</p>
-    <h2>1. Áreas de Cobertura</h2>
-    <p>Actualmente despachamos a lo largo de <strong>Lima Metropolitana y Callao</strong> de acuerdo a zonas pre-establecidas. El costo de despacho se calcula de forma dinámica en la ventana de pago o <em>Checkout</em>.</p>
-    <h3>1.1 Consideraciones</h3>
-    <ul>
-        <li>Los tiempos estimados de entrega son de <strong>24 a 48 horas hábiles</strong> dependiendo de la demanda.</li>
-        <li>Las entregas se realizan entre las 9:00 a.m. y las 6:00 p.m.</li>
-    </ul>
-    <h2>2. Fallos en Entrega</h2>
-    <p>Si el despachador no lograra ubicar a una persona autorizada en el domicilio luego de un tiempo de espera de 15 minutos, el producto retornará a nuestras instalaciones y se programará una segunda visita (la cual tendrá costo adicional).</p>
+Nuestra prioridad es que el alimento de tu mascota llegue a tiempo. Para lograrlo, mantenemos una política de despachos centralizada.
+
+## 1. Áreas de Cobertura
+Actualmente despachamos a lo largo de **Lima Metropolitana y Callao** de acuerdo a zonas pre-establecidas. El costo de despacho se calcula de forma dinámica en la ventana de pago o *Checkout*.
+
+### 1.1 Consideraciones
+- Los tiempos estimados de entrega son de **24 a 48 horas hábiles** dependiendo de la demanda.
+- Las entregas se realizan entre las 9:00 a.m. y las 6:00 p.m.
+
+## 2. Fallos en Entrega
+Si el despachador no lograra ubicar a una persona autorizada en el domicilio luego de un tiempo de espera de 15 minutos, el producto retornará a nuestras instalaciones y se programará una segunda visita (la cual tendrá costo adicional).
     $$, 
     true, 
     NOW()
@@ -1059,23 +1213,23 @@ INSERT INTO content_pages (slug, title, content, is_active, published_at) VALUES
 - [ ] Plazo de respuesta visible (30 días calendario)
 - [ ] Página de consulta de estado del reclamo
 
-**Frontend:** `src/features/legal/pages/ComplaintsBookPage.tsx`
+**Frontend:** `src/features/legal/pages/ClaimsBookPage.tsx`
 
 **Supabase (`04_legal_compliance`):**
 
 ```sql
-CREATE TYPE complaint_type AS ENUM ('claim', 'complaint');
-CREATE TYPE complaint_status AS ENUM ('pending', 'in_review', 'resolved', 'closed');
+CREATE TYPE claim_type AS ENUM ('claim', 'complaint');
+CREATE TYPE claim_status AS ENUM ('pending', 'in_review', 'resolved', 'closed');
 CREATE TYPE document_type AS ENUM ('dni', 'ce', 'passport', 'ruc');
 
 -- Libro de reclamaciones
-CREATE TABLE complaints (
+CREATE TABLE claims (
     id BIGINT GENERATED BY DEFAULT AS IDENTITY PRIMARY KEY,
     ticket_number TEXT NOT NULL UNIQUE,
     
     -- ESTADO
-    type complaint_type NOT NULL,
-    status complaint_status NOT NULL DEFAULT 'pending',
+    type claim_type NOT NULL,
+    status claim_status NOT NULL DEFAULT 'pending',
     
     -- QUIÉN (Datos del Consumidor)
     doc_type document_type NOT NULL, 
@@ -1104,56 +1258,38 @@ CREATE TABLE complaints (
     created_at TIMESTAMPTZ NOT NULL DEFAULT NOW(),
     updated_at TIMESTAMPTZ NOT NULL DEFAULT NOW()
 );
-
--- RPC: Generar número de reclamo único
-CREATE OR REPLACE FUNCTION generate_complaint_number()
-RETURNS TEXT AS $$
-    -- Formato: LR-YYYY-XXXXXX (secuencial por año)
-$$ LANGUAGE plpgsql SECURITY DEFINER;
-
--- RPC: Crear reclamo completo con generación de PDF
-CREATE OR REPLACE FUNCTION create_complaint(
-    p_complaint_data JSONB
-) RETURNS JSONB AS $$
-    -- Valida datos, genera número, crea registro
-    -- Retorna: { complaint_id, complaint_number, pdf_url }
-$$ LANGUAGE plpgsql SECURITY DEFINER;
 ```
 
 ---
 
 ## Módulo 5: Administración (Back-office)
 
-### HU-5.1: Dashboard de Métricas
+### HU-5.1: Reportes y métricas
 
-**User Story:** Como administrador, quiero ver métricas clave del negocio.
+**User Story:** Como administrador, quiero revisar reportes de ventas y suscripciones para tomar decisiones rápidas.
 
 **Criterios de Aceptación:**
 
-- [ ] Card de ventas totales: día, semana, mes
-- [ ] Card de órdenes pendientes
-- [ ] Card de suscripciones activas vs canceladas
-- [ ] Card de MRR (Monthly Recurring Revenue) calculado
-- [ ] Alerta de productos con stock bajo
-- [ ] Top 5 productos más vendidos
-- [ ] Gráfico de evolución de ventas
-- [ ] Filtros por rango de fecha
-- [ ] Exportar datos a CSV
+- [x] Cards con ventas aprobadas, órdenes aprobadas, ticket promedio, suscripciones activas y MRR estimado.
+- [x] Listado de top productos por ingresos y unidades vendidas.
+- [x] Evolución de ventas por periodo (día/semana/mes).
+- [x] Filtro de rango: últimos 7/30/90 días y mes actual.
+- [ ] Exportar resumen en CSV.
 
-**Frontend:** `src/features/admin/pages/DashboardPage.tsx`
+**Frontend:** `src/features/admin/reports/pages/AdminReportsPage.tsx`
 
 **Supabase (`05_admin_backoffice`):**
 
 ```sql
--- RPC: Obtener métricas del dashboard
-CREATE OR REPLACE FUNCTION get_dashboard_metrics(
+-- RPC: Resumen de reportes (ventas y suscripciones)
+CREATE OR REPLACE FUNCTION get_reports_overview(
     p_date_from TIMESTAMPTZ DEFAULT NULL,
     p_date_to TIMESTAMPTZ DEFAULT NULL
 ) RETURNS JSONB AS $$
-    -- Retorna: { total_sales, pending_orders, active_subscriptions, mrr, low_stock_products[], top_products[] }
+    -- Retorna: { total_sales, approved_orders, avg_order_value, active_subscriptions, mrr, top_products[] }
 $$ LANGUAGE plpgsql SECURITY DEFINER;
 
--- RPC: Obtener evolución de ventas para gráfico
+-- RPC: Evolución de ventas por periodo
 CREATE OR REPLACE FUNCTION get_sales_evolution(
     p_date_from TIMESTAMPTZ,
     p_date_to TIMESTAMPTZ,
@@ -1171,61 +1307,20 @@ $$ LANGUAGE plpgsql SECURITY DEFINER;
 
 **Criterios de Aceptación:**
 
-- [ ] Listado de órdenes con filtros: estado, fecha, cliente, número de orden
-- [ ] Ver detalle completo: items, dirección, pago, notas
-- [ ] Cambiar estado del pedido
-- [ ] Registrar cambio de estado en historial
-- [ ] Agregar tracking de envío (carrier, número de guía)
-- [ ] Marcar como enviado/entregado
-- [ ] Procesar devolución con cambio de estado
-- [ ] Agregar notas internas por cambio de estado
-- [ ] Búsqueda rápida por número de orden
+- [x] Listado de órdenes con filtros: estado, fecha, cliente, número de orden.
+- [x] Ver detalle completo: items, dirección, pago.
+- [x] Cambiar estado del pedido.
+- [x] Marcar como enviado/entregado.
+- [x] Procesar devolución con cambio de estado.
+- [x] Búsqueda rápida por número de orden.
 
-**Frontend:** `src/features/admin/pages/OrdersManagementPage.tsx`
+**Frontend:** `src/features/admin/orders/pages/AdminOrdersPage.tsx`
 
 **Supabase (`05_admin_backoffice`):**
 
 ```sql
--- Historial de estado de órdenes
-CREATE TABLE order_status_history (
-    id BIGINT GENERATED BY DEFAULT AS IDENTITY PRIMARY KEY,
-    order_id BIGINT NOT NULL REFERENCES orders(id) ON DELETE CASCADE,
-    status order_status NOT NULL,
-    notes TEXT,
-    created_by BIGINT REFERENCES profiles(id) ON DELETE SET NULL,
-    created_at TIMESTAMPTZ NOT NULL DEFAULT NOW()
-);
-
--- Envíos
-CREATE TABLE order_shipments (
-    id BIGINT GENERATED BY DEFAULT AS IDENTITY PRIMARY KEY,
-    order_id BIGINT NOT NULL REFERENCES orders(id) ON DELETE CASCADE,
-    carrier TEXT NOT NULL,
-    tracking_number TEXT NOT NULL,
-    label_url TEXT,
-    shipped_at TIMESTAMPTZ,
-    delivered_at TIMESTAMPTZ
-);
-
--- RPC: Actualizar estado de orden con historial
-CREATE OR REPLACE FUNCTION update_order_status(
-    p_order_id BIGINT,
-    p_new_status order_status,
-    p_notes TEXT DEFAULT NULL
-) RETURNS JSONB AS $$
-    -- Actualiza orden + registra en historial
-    -- Retorna: { success, order_id, new_status }
-$$ LANGUAGE plpgsql SECURITY DEFINER;
-
--- RPC: Agregar tracking de envío
-CREATE OR REPLACE FUNCTION add_order_shipment(
-    p_order_id BIGINT,
-    p_carrier TEXT,
-    p_tracking_number TEXT
-) RETURNS JSONB AS $$
-    -- Crea shipment + actualiza estado a 'shipped'
-    -- Retorna: { shipment_id, label_url }
-$$ LANGUAGE plpgsql SECURITY DEFINER;
+-- Sin RPCs adicionales para esta HU.
+-- La actualizacion de estado se realiza con un update directo a la tabla orders.
 ```
 
 ---
@@ -1236,131 +1331,180 @@ $$ LANGUAGE plpgsql SECURITY DEFINER;
 
 **Criterios de Aceptación:**
 
-- [ ] Listado de productos con stock actual
-- [ ] Indicador visual de productos bajo umbral de alerta
-- [ ] Registro de movimientos de inventario
-- [ ] Tipos de movimiento: compra, venta, ajuste, devolución, daño
-- [ ] Ajuste manual de stock con motivo obligatorio
-- [ ] Referencia a orden relacionada si aplica
-- [ ] Historial completo de cambios por producto
-- [ ] Configurar alertas de stock bajo por producto
-- [ ] Notificaciones por email cuando se alcanza umbral
+- [x] Listado de productos con stock actual y alertas de stock bajo.
+- [x] Busqueda por nombre o SKU.
+- [x] Filtro por categoria.
+- [x] Indicador visual de stock bajo.
+- [x] Crear y editar producto base (datos principales, B2B, suscripciones).
+- [x] Gestion de imagenes, ingredientes, nutricion y variantes.
+- [x] Agregar y quitar variantes.
+- [x] Activar/Desactivar producto en catalogo con validaciones.
+- [x] Ajuste manual de stock por variante.
+- [ ] Eliminar producto.
 
-**Frontend:** `src/features/admin/pages/InventoryPage.tsx`
+**Frontend:** `src/features/admin/inventory/pages/AdminInventoryPage.tsx`
 
 **Supabase (`05_admin_backoffice`):**
 
 ```sql
-CREATE TYPE inventory_movement_type AS ENUM ('purchase', 'sale', 'adjustment', 'return', 'damage');
-
--- Movimientos de inventario
-CREATE TABLE inventory_movements (
-    id BIGINT GENERATED BY DEFAULT AS IDENTITY PRIMARY KEY,
-    product_id BIGINT NOT NULL REFERENCES products(id) ON DELETE CASCADE,
-    type inventory_movement_type NOT NULL,
-    quantity INTEGER NOT NULL,
-    reason TEXT,
-    reference_id TEXT,
-    created_by BIGINT REFERENCES profiles(id) ON DELETE SET NULL,
-    created_at TIMESTAMPTZ NOT NULL DEFAULT NOW()
-);
-
--- Alertas de stock
-CREATE TABLE stock_alerts (
-    id BIGINT GENERATED BY DEFAULT AS IDENTITY PRIMARY KEY,
-    product_id BIGINT NOT NULL REFERENCES products(id) ON DELETE CASCADE,
-    threshold INTEGER NOT NULL CHECK (threshold >= 0),
-    notify_emails TEXT[] NOT NULL DEFAULT '{}',
-    is_active BOOLEAN NOT NULL DEFAULT TRUE
-);
-
--- RPC: Ajustar stock manualmente
-CREATE OR REPLACE FUNCTION adjust_stock(
-    p_product_id BIGINT,
-    p_quantity INTEGER,
-    p_type inventory_movement_type,
-    p_reason TEXT,
-    p_reference_id TEXT DEFAULT NULL
-) RETURNS JSONB AS $$
-    -- Registra movimiento + actualiza stock en producto
-    -- Retorna: { success, new_stock, movement_id }
-$$ LANGUAGE plpgsql SECURITY DEFINER;
-
--- Trigger: Verificar umbral de stock bajo
-CREATE OR REPLACE FUNCTION handle_stock_alert_check()
-RETURNS TRIGGER AS $$
-    -- Si stock < threshold, envía notificación
-$$ LANGUAGE plpgsql SECURITY DEFINER;
-
-CREATE TRIGGER on_product_stock_change
-AFTER UPDATE OF stock_quantity ON products
-FOR EACH ROW EXECUTE FUNCTION handle_stock_alert_check();
+-- El stock se gestiona en products.variants[*].stock.
+-- La gestion de catalogo se realiza con CRUD directo en products.
+-- No se usan tablas adicionales ni RPC para esta HU.
 ```
 
 ---
 
-### HU-5.4: Gestión de Cuentas Profesionales (B2B)
+### HU-5.4: Gestión del Directorio Profesional (B2B)
 
-**User Story:** Como administrador, quiero validar y gestionar cuentas profesionales.
+**User Story:** Como administrador, quiero validar y gestionar las cuentas de los profesionales antes de que aparezcan en el directorio público y accedan a descuentos.
 
 **Criterios de Aceptación:**
 
-- [ ] Listado de solicitudes de cuentas profesionales pendientes
-- [ ] Ver datos: RUC, razón social, afijo profesional, documento
-- [ ] Validar RUC con API SUNAT
-- [ ] Aprobar/Rechazar solicitud con comentarios
-- [ ] Listado de cuentas B2B activas
-- [ ] Suspender/Reactivar cuenta profesional
-- [ ] Historial de cambios de estado
+- [ ] Listado de perfiles profesionales pendientes de aprobación.
+- [ ] Ver datos de validación: RUC, colegiatura, sustentos.
+- [ ] Aprobar/Rechazar perfil para publicarlo en el directorio y otorgar beneficios B2B.
+- [ ] Suspender/Reactivar perfil en caso de mala praxis o inactividad.
 
-**Frontend:** `src/features/admin/pages/B2BAccountsPage.tsx`
+**Frontend:** `src/features/admin/professionals/pages/AdminProfessionalsPage.tsx`
 
 **Supabase (`05_admin_backoffice`):**
 
 ```sql
-CREATE TYPE b2b_account_status AS ENUM ('pending', 'approved', 'rejected', 'suspended');
+-- La estructura de professional_profiles ahora se define íntegramente en el Módulo 7 (HU-7.1)
+-- Aquí solo se gestionan los RPCs administrativos para cambiar los estados:
 
--- Cuentas B2B
-CREATE TABLE b2b_accounts (
-    id BIGINT GENERATED BY DEFAULT AS IDENTITY PRIMARY KEY,
-    profile_id BIGINT NOT NULL REFERENCES profiles(id) ON DELETE CASCADE,
-    business_name TEXT NOT NULL,
-    ruc TEXT NOT NULL UNIQUE CHECK (LENGTH(ruc) = 11),
-    professional_affix TEXT,
-    professional_type TEXT,
-    document_url TEXT,
-    status b2b_account_status NOT NULL DEFAULT 'pending',
-    approved_by BIGINT REFERENCES profiles(id) ON DELETE SET NULL,
-    approved_at TIMESTAMPTZ,
-    rejection_reason TEXT,
-    created_at TIMESTAMPTZ NOT NULL DEFAULT NOW(),
-    updated_at TIMESTAMPTZ NOT NULL DEFAULT NOW()
-);
-
--- Índice único: Solo 1 cuenta B2B por perfil
-CREATE UNIQUE INDEX idx_unique_b2b_per_user ON b2b_accounts(profile_id);
-
--- RPC: Aprobar cuenta B2B
-CREATE OR REPLACE FUNCTION approve_b2b_account(
-    p_account_id BIGINT,
+-- RPC: Aprobar perfil profesional
+CREATE OR REPLACE FUNCTION approve_professional_profile(
+    p_profile_id BIGINT,
     p_admin_id UUID
 ) RETURNS JSONB AS $$
-    -- Actualiza status, approved_by, approved_at
+    -- Actualiza status = 'approved', approved_by, approved_at en professional_profiles
     -- Envía email de aprobación
-    -- Retorna: { success, account_id }
+    -- Retorna: { success, profile_id }
 $$ LANGUAGE plpgsql SECURITY DEFINER;
 
--- RPC: Rechazar cuenta B2B
-CREATE OR REPLACE FUNCTION reject_b2b_account(
-    p_account_id BIGINT,
+-- RPC: Rechazar perfil profesional
+CREATE OR REPLACE FUNCTION reject_professional_profile(
+    p_profile_id BIGINT,
     p_admin_id UUID,
     p_reason TEXT
 ) RETURNS JSONB AS $$
-    -- Actualiza status, rejection_reason
-    -- Envía email de rechazo con motivo
-    -- Retorna: { success, account_id }
+    -- Actualiza status = 'rejected', rejection_reason en professional_profiles
+    -- Envía email de rechazo con el motivo
+    -- Retorna: { success, profile_id }
 $$ LANGUAGE plpgsql SECURITY DEFINER;
 ```
+
+---
+
+### HU-5.5: Usuarios y roles
+
+**User Story:** Como administrador, quiero gestionar accesos y roles de usuarios.
+
+**Criterios de Aceptación:**
+
+- [x] Listado de usuarios con búsqueda y filtros por rol/estado.
+- [x] Edición de rol principal (user/b2b/admin) con jerarquia.
+- [x] Suspender/Reactivar usuarios (soft delete con `deleted_at`).
+- [ ] Invitacion o creacion manual de usuarios.
+
+**Frontend:** `src/features/admin/users/pages/AdminUsersPage.tsx`
+
+**Supabase (`06_complementary`):**
+
+```sql
+-- Tablas base
+-- profiles, roles, profile_roles
+-- (Opcional) Vista de auth.users para email
+```
+
+---
+
+### HU-5.6: Gestión de cupones y promociones
+
+**User Story:** Como administrador, quiero crear y controlar cupones de descuento.
+
+**Criterios de Aceptación:**
+
+- [x] CRUD de cupones con tipos (porcentaje, monto fijo, envio gratis).
+- [x] Activar/Desactivar cupones con confirmacion.
+- [x] Filtros por estado, tipo y busqueda por codigo.
+- [x] Visibilidad de usos y limites.
+
+**Frontend:** `src/features/admin/coupons/pages/AdminCouponsPage.tsx`
+
+**Supabase (`02_store_ecommerce`):**
+
+```sql
+-- Tabla coupons
+```
+
+---
+
+### HU-5.7: CMS de contenido y legal
+
+**User Story:** Como administrador, quiero editar el contenido publico sin depender de desarrollo.
+
+**Criterios de Aceptación:**
+
+- [x] Configuracion de landing (hero, beneficios, how it works, trust, FAQ, CTA).
+- [x] Configuracion de pagina Nosotros (hero, mision/vision, timeline).
+- [x] Blog CMS: categorias, posts, publicar/despublicar, articulo principal.
+- [x] FAQs: categorias y preguntas con orden.
+- [x] Documentos legales (privacy, terminos, devoluciones, envios) en Markdown.
+- [x] Pickers de productos, testimonios y FAQs para la home.
+
+**Frontend:**
+`src/features/admin/content/pages/AdminContentLandingPage.tsx`,
+`src/features/admin/content/pages/AdminContentAboutPage.tsx`,
+`src/features/admin/content/pages/AdminContentBlogPage.tsx`,
+`src/features/admin/content/pages/AdminContentFaqPage.tsx`,
+`src/features/admin/content/pages/AdminContentLegalPage.tsx`
+
+**Supabase:**
+
+```sql
+-- home_page_config, about_page_config
+-- blog_categories, blog_posts
+-- faq_categories, faqs
+-- content_pages
+-- products, testimonials (pickers)
+```
+
+---
+
+### HU-5.8: Gestión de reclamos (Admin)
+
+**User Story:** Como administrador, quiero gestionar reclamos del Libro de Reclamaciones.
+
+**Criterios de Aceptación:**
+
+- [ ] Listado de reclamos con filtros por estado.
+- [ ] Ver detalle completo del reclamo.
+- [ ] Registrar respuesta y cambio de estado.
+- [ ] Exportar reporte de reclamos.
+
+**Frontend:** `src/features/admin/claims/pages/AdminClaimsPage.tsx`
+
+**Supabase (`04_legal_compliance`):**
+
+```sql
+-- Tabla claims
+```
+
+---
+
+### HU-5.9: Panel administrativo
+
+**User Story:** Como administrador, quiero un panel de inicio con accesos directos.
+
+**Criterios de Aceptación:**
+
+- [x] Vista de bienvenida con accesos rapidos a modulos clave.
+- [x] Resumen visual de tareas del dia.
+- [ ] Indicadores conectados a datos reales.
+
+**Frontend:** `src/features/admin/dashboard/pages/AdminDashboardPage.tsx`
 
 ---
 
@@ -1413,9 +1557,9 @@ CREATE TABLE roles (
 );
 
 INSERT INTO roles (id, name, description) VALUES
-    (1, 'admin', 'Administrador'),
-    (2, 'b2b', 'Cliente profesional o mayorista'),
-    (3, 'user', 'Usuario estándar');
+    (1, 'admin', 'Administrador principal'),
+    (2, 'professional', 'Profesional en Mascotas'),
+    (3, 'user', 'Usuario estándar o Dueño de Mascota');
 
 -- Relación perfiles-roles
 CREATE TABLE profile_roles (
@@ -1561,112 +1705,327 @@ $$ LANGUAGE plpgsql SECURITY INVOKER;
 
 ---
 
-## Módulo 7: Canal Profesional (B2B)
+## Módulo 7: Directorio Profesional
 
-### HU-7.1: Registro Profesional
+### HU-7.1: Landing Page del Directorio Profesional
 
-**User Story:** Como profesional (criador/veterinario), quiero registrarme para acceder a precios especiales.
+**User Story:** Como visitante o dueño de mascota, quiero ver una página de inicio (Landing Page) atractiva del directorio con herramientas de búsqueda rápida, categorías y propuesta de valor para entender cómo encontrar y agendar con el profesional adecuado, además de una invitación para que nuevos profesionales se unan.
 
 **Criterios de Aceptación:**
 
-- [ ] Formulario de registro profesional:
-  - Razón social
-  - RUC (11 dígitos)
-  - Afijo profesional (opcional, para criadores)
-  - Tipo de profesional (criador/veterinario/tienda)
-  - Documento de acreditación (subir archivo)
-- [ ] Validación de RUC con formato peruano
-- [ ] Estado: "Pendiente de aprobación"
-- [ ] Email de confirmación de solicitud
-- [ ] Email de aprobación/rechazo
+- [ ] Hero banner dinámico con buscador principal integrado (Especialidad y Lugar) y botón "Buscar".
+- [ ] Renderizado de imágenes/tarjetas superpuestas de profesionales destacados en el hero.
+- [ ] Sección de categorías de ayuda (ej. Veterinaria general, Nutrición, Grooming, etc.) dinámicas.
+- [ ] Sección de propuesta de valor "¿Cómo cuidamos la calidad de los profesionales?" con puntos clave ilustrados.
+- [ ] Sección CTA inferior "¿Eres profesional y quieres aparecer en +Kot?" para invitar a nuevos registros.
+- [ ] Toda la información de la landing (títulos, textos, imágenes, categorías mostradas) debe ser configurable mediante secciones JSONB.
+- [ ] Loading skeleton mientras cargan los datos dinámicos.
+- [ ] Mobile-first responsive acorde al diseño provisto.
 
-**Frontend:** `src/features/b2b/pages/B2BRegistrationPage.tsx`
+**Frontend:** `src/features/directory/pages/DirectoryLandingPage.tsx`, `directoryLandingService.ts`
 
-**Supabase (`07_b2b_professional`):**
+**Supabase (`07_professional_directory`):**
 
 ```sql
--- Nota: La tabla b2b_accounts ya fue definida en el módulo 5 (admin)
--- Aquí solo agregamos las funciones específicas del proceso de registro
+-- Configuración de Landing Page del Directorio Profesional
+CREATE TABLE professional_page_config (
+    id INTEGER PRIMARY KEY CHECK (id = 1),
+    
+    -- 1er Bloque: Hero y Buscador Rápido
+    hero_section JSONB NOT NULL DEFAULT '{}'::jsonb,
+    
+    -- 2do Bloque: Categorías / "Qué tipo de ayuda necesitas"
+    categories_section JSONB NOT NULL DEFAULT '{}'::jsonb,
+    
+    -- 3er Bloque: Propuesta de Valor
+    value_proposition_section JSONB NOT NULL DEFAULT '{}'::jsonb,
+    
+    -- 4to Bloque: Captación de Profesionales (CTA)
+    professional_cta_section JSONB NOT NULL DEFAULT '{}'::jsonb,
+    
+    updated_at TIMESTAMPTZ NOT NULL DEFAULT NOW()
+);
 
--- RPC: Crear solicitud de cuenta B2B
-CREATE OR REPLACE FUNCTION create_b2b_account_request(
-    p_user_id UUID,
-    p_business_name TEXT,
-    p_ruc TEXT,
-    p_professional_affix TEXT,
-    p_professional_type TEXT,
-    p_document_url TEXT
+-- Datos iniciales (Seed) para el Landing de Directorio
+INSERT INTO professional_page_config (
+    id,
+    hero_section,
+    categories_section,
+    value_proposition_section,
+    professional_cta_section
+) VALUES (
+    1,
+    '{
+        "title": "Encuentra profesionales para tu perro, por especialidad y zona.",
+        "subtitle": "Busca, compara y elige con más claridad, sin perder tiempo preguntando a ciegas.",
+        "search_placeholders": {
+            "specialty": "Especialidad",
+            "location": "Lugar"
+        },
+        "search_button_text": "Buscar",
+        "hero_images": [
+            "https://images.unsplash.com/photo-1629909613654-28e377c37b09?auto=format&fit=crop&q=80&w=400&h=600",
+            "https://images.unsplash.com/photo-1576201836106-db1758fd1c97?auto=format&fit=crop&q=80&w=400&h=600",
+            "https://images.unsplash.com/photo-1548199973-03cce0bbc87b?auto=format&fit=crop&q=80&w=400&h=600"
+        ]
+    }'::jsonb,
+    '{
+        "title": "¿Qué tipo de ayuda necesitas hoy?",
+        "subtitle": "Cuando no tienes el nombre exacto de lo que necesitas, las categorías te guían. Entra a una categoría, filtra por tu zona y encuentra opciones alineadas a tu caso."
+    }'::jsonb,
+    '{
+        "title": "¿Cómo cuidamos la calidad de los profesionales?",
+        "image_url": "https://images.unsplash.com/photo-1599443015574-be5fe8a05783?auto=format&fit=crop&q=80&w=800",
+        "points": [
+            {
+                "number": "1",
+                "title": "Perfiles con información útil",
+                "description": "Cada perfil está pensado para ayudarte a comparar sin adivinar: qué hace, cómo atiende y lo necesario para decidir con claridad antes de contactar."
+            },
+            {
+                "number": "2",
+                "title": "Orden por especialidad y zona",
+                "description": "Encontrar el profesional correcto no debería tomarte horas. Al buscar por especialidad y ubicación reduces ruido y llegas más rápido a opciones alineadas a tu caso."
+            },
+            {
+                "number": "3",
+                "title": "Señales de confianza visibles",
+                "description": "A medida que el directorio crece, incorporamos señales que suman contexto real, como información más completa y reseñas cuando están disponibles, para que elijas con más seguridad."
+            }
+        ]
+    }'::jsonb,
+    '{
+        "title": "¿Eres profesional y quieres aparecer en +Kot?",
+        "description": "Postula en menos de 2 minutos y crea tu perfil para que dueños de perros te encuentren por especialidad y zona. Te avisaremos cuando tu perfil esté publicado y listo para recibir consultas.",
+        "cta_text": "Postular",
+        "cta_link": "/professionals/register",
+        "image_urls": [
+            "https://images.unsplash.com/photo-1537151608804-ea2f1cb0464f?auto=format&fit=crop&q=80&w=300",
+            "https://images.unsplash.com/photo-1543466835-00a7907e9de1?auto=format&fit=crop&q=80&w=300"
+        ]
+    }'::jsonb
+);
+```
+
+---
+
+### HU-7.2: Perfil Público y Registro del Profesional
+
+**User Story:** Como profesional de mascotas, quiero registrarme, acreditar mi identidad y crear un perfil detallado de mi práctica en un solo lugar para que los dueños me encuentren y pueda acceder a los descuentos exclusivos.
+
+**Criterios de Aceptación:**
+
+- [ ] Formulario unificado de registro: Datos legales (RUC, Empresa) + Datos del Perfil (Título profesional, y selección de primera Especialidad/Servicio).
+- [ ] Estado de validación por parte de MasKot (Pendiente, Aprobado, Rechazado).
+- [ ] Una vez "Aprobado", el perfil puede publicarse (`is_published = true`) y el profesional obtiene automáticamente los precios especiales en la tienda.
+- [ ] Panel de gestión: Configuración de Nombre público, Título (Ej: Médico Veterinario), y gestión de su Catálogo de Servicios (asignando a qué Especialidad del sistema pertenece cada servicio).
+- [ ] Experiencia y Resumen (Texto descriptivo + lista de condiciones tratadas).
+- [ ] Lista de Servicios y Precios "Desde" (Ej: "Consulta presencial desde S/ 60.00").
+- [ ] Galería de 4-6 fotos para generar confianza (clínica, equipos, espacio).
+- [ ] Ubicación: Dirección exacta vinculada a coordenadas (lat/lng) para el mapa.
+- [ ] Sistema de testimonios de tutores con rating (1-5 estrellas).
+- [ ] Previsualización de disponibilidad de calendario.
+
+**Frontend:** `src/features/professionals/pages/ProfessionalRegistrationProfile.tsx`, `ProfessionalProfilePublicPage.tsx`
+
+**Supabase (`07_professional_directory`):**
+
+```sql
+CREATE TYPE professional_profile_status AS ENUM ('pending', 'approved', 'rejected', 'suspended');
+
+-- Catálogo Maestro de Especialidades (Administrado por MasKot)
+CREATE TABLE professional_specialties (
+    id BIGINT GENERATED BY DEFAULT AS IDENTITY PRIMARY KEY,
+    name TEXT NOT NULL UNIQUE,
+    slug TEXT NOT NULL UNIQUE,
+    icon_url TEXT,
+    display_order INTEGER NOT NULL DEFAULT 0 CHECK (display_order >= 0),
+    is_active BOOLEAN NOT NULL DEFAULT TRUE
+);
+
+-- Perfil unificado del profesional (Datos legales + Directorio Público)
+CREATE TABLE professional_profiles (
+    id BIGINT GENERATED BY DEFAULT AS IDENTITY PRIMARY KEY,
+    profile_id BIGINT UNIQUE NOT NULL REFERENCES profiles(id) ON DELETE CASCADE,
+    
+    -- [1] Datos Legales para validación y facturación
+    business_name TEXT NOT NULL,
+    ruc TEXT NOT NULL UNIQUE CHECK (LENGTH(ruc) = 11),
+    legal_document_url TEXT,
+    
+    -- [2] Estado de Validación MasKot
+    status professional_profile_status NOT NULL DEFAULT 'pending',
+    approved_by BIGINT REFERENCES profiles(id) ON DELETE SET NULL,
+    approved_at TIMESTAMPTZ,
+    rejection_reason TEXT,
+    
+    -- [3] Datos Públicos del Directorio
+    public_name TEXT NOT NULL, 
+    title TEXT NOT NULL, 
+    experience_summary TEXT,
+    base_price NUMERIC(10, 2),
+    consultation_types TEXT[] DEFAULT '{}',
+    
+    -- [4] Multimedia
+    profile_photo_url TEXT,
+    gallery_urls TEXT[] DEFAULT '{}',
+    
+    -- [5] Localización para Búsqueda y Mapa
+    address_text TEXT NOT NULL,
+    latitude NUMERIC(10, 8),
+    longitude NUMERIC(11, 8),
+    
+    -- [6] Métricas de Testimonios
+    average_rating NUMERIC(3, 2) DEFAULT 0.00,
+    total_reviews INTEGER DEFAULT 0,
+    
+    -- Visibilidad
+    is_published BOOLEAN DEFAULT FALSE,
+    created_at TIMESTAMPTZ DEFAULT NOW(),
+    updated_at TIMESTAMPTZ DEFAULT NOW()
+);
+
+-- Servicios ofrecidos por el profesional (Tabla Intermedia entre Especialidad y Profesional)
+CREATE TABLE professional_services (
+    id BIGINT GENERATED BY DEFAULT AS IDENTITY PRIMARY KEY,
+    professional_profile_id BIGINT NOT NULL REFERENCES professional_profiles(id) ON DELETE CASCADE,
+    professional_specialty_id BIGINT NOT NULL REFERENCES professional_specialties(id) ON DELETE CASCADE,
+    
+    name TEXT NOT NULL,
+    description TEXT,
+    price NUMERIC(10, 2),
+    is_active BOOLEAN NOT NULL DEFAULT TRUE
+);
+
+-- Semilla de Especialidades (Catálogo Central)
+INSERT INTO professional_specialties (name, slug, display_order) VALUES
+('Veterinaria General', 'veterinaria-general', 10),
+('Nutrición', 'nutricion', 20),
+('Odontología', 'odontologia', 30),
+('Dermatología', 'dermatologia', 40),
+('Grooming y Estética', 'grooming', 50),
+('Entrenamiento', 'entrenamiento', 60),
+('Rehabilitación', 'rehabilitacion', 70);
+```
+
+---
+
+### HU-7.3: Búsqueda y Directorio Interactivo (Mapa)
+
+**User Story:** Como dueño de mascota, quiero buscar profesionales cercanos e idóneos para agendar la atención que necesita mi mascota.
+
+**Integración de Mapas:** Google Maps Platform (Maps JavaScript API + Places API).  
+**Variable de entorno:** `VITE_GOOGLE_MAPS_API_KEY`  
+**Dependencia frontend:** `@vis.gl/react-google-maps`
+
+**Criterios de Aceptación:**
+
+- [ ] Barra de filtros: Categoría (specialty), Etiqueta (consultation_type), Ordenar por (rating/precio/nombre), Buscar (texto libre).
+- [ ] Chips de filtros activos removibles.
+- [ ] Split-View (Desktop) y Toggle (Mobile): 
+  - [ ] Lado izquierdo: Listado de tarjetas de profesionales.
+  - [ ] Lado derecho: Mapa interactivo (Google Maps) con pins por profesional.
+- [ ] Tarjeta de Profesional: Foto, public_name, title, average_rating con estrellas, address_text, consultation_types, base_price.
+- [ ] Mapa con markers, bounds automáticos, botón "Ampliar mapa", InfoWindow en click.
+
+**Frontend:** `src/features/directory/pages/SpecialistsPage.tsx`  
+**Componentes:** `SpecialistsFilterBar.tsx`, `ProfessionalCard.tsx`, `GoogleMapView.tsx`
+
+**Supabase (`07_professional_directory`):**
+
+```sql
+-- RPC: Búsqueda geo-espacial y por filtros
+CREATE OR REPLACE FUNCTION search_professionals(
+    p_specialty TEXT DEFAULT NULL,
+    p_location TEXT DEFAULT NULL,
+    p_lat NUMERIC DEFAULT NULL,
+    p_lng NUMERIC DEFAULT NULL,
+    p_radius_km NUMERIC DEFAULT 10
 ) RETURNS JSONB AS $$
-    -- Valida formato de RUC
-    -- Crea registro en b2b_accounts con status 'pending'
-    -- Envía email de confirmación
-    -- Retorna: { success, account_id }
-$$ LANGUAGE plpgsql SECURITY DEFINER;
+    -- Retorna registros de professional_profiles donde status = 'approved' AND is_published = TRUE
+$$ LANGUAGE plpgsql SECURITY INVOKER;
 ```
 
 ---
 
-### HU-7.2: Catálogo B2B con Precios Especiales
+### HU-7.4: Herramienta de Agendamiento de Citas
 
-**User Story:** Como profesional aprobado, quiero ver precios especiales.
+**User Story:** Como usuario, quiero ver la información completa de un profesional y reservar una franja horaria para atender a mi mascota.
 
 **Criterios de Aceptación:**
 
-- [ ] Catálogo filtrado: solo productos B2B
-- [ ] Badge "Precio Profesional" en cards
-- [ ] Mostrar precio regular tachado y precio B2B
-- [ ] % de descuento visible
-- [ ] Mínimo de orden para precio B2B
-- [ ] Restricción: solo usuarios con cuenta B2B aprobada
+- [ ] Bloque lateral tipo Widget "Booking" en la ficha del profesional.
+- [ ] Selector principal de Motivo de Citas.
+- [ ] Grilla de Horarios interactiva con franjas de disponibilidad.
+- [ ] Sistema de Testimonios (solo clientes que cruzaron por la pasarela de citas completadas).
 
-**Frontend:** `src/features/b2b/pages/B2BCatalogPage.tsx`
+**Frontend:** `src/features/directory/pages/ProfessionalDetailPage.tsx`, `BookingWidget.tsx`
 
-**Supabase (`07_b2b_professional`):**
+**Supabase (`07_professional_directory`):**
 
 ```sql
--- RPC: Obtener productos B2B con validación de cuenta
-CREATE OR REPLACE FUNCTION get_b2b_products(p_user_id UUID)
-RETURNS TABLE (
-    product_id BIGINT,
-    name TEXT,
-    regular_price NUMERIC,
-    b2b_price NUMERIC,
-    discount_pct NUMERIC
-) AS $$
-    -- Valida que usuario tenga cuenta B2B aprobada
-    -- Retorna productos con is_b2b_product = TRUE
-$$ LANGUAGE plpgsql SECURITY DEFINER;
+CREATE TYPE professional_appointment_status AS ENUM ('pending', 'confirmed', 'completed', 'cancelled', 'no_show');
+
+-- Horarios disponibles
+CREATE TABLE professional_availability (
+    id BIGINT GENERATED BY DEFAULT AS IDENTITY PRIMARY KEY,
+    professional_profile_id BIGINT NOT NULL REFERENCES professional_profiles(id) ON DELETE CASCADE,
+    day_of_week INTEGER NOT NULL CHECK (day_of_week BETWEEN 0 AND 6),
+    start_time TIME NOT NULL,
+    end_time TIME NOT NULL,
+    is_active BOOLEAN NOT NULL DEFAULT TRUE
+);
+
+-- Citas/Reservas agendadas
+CREATE TABLE professional_appointments (
+    id BIGINT GENERATED BY DEFAULT AS IDENTITY PRIMARY KEY,
+    professional_profile_id BIGINT NOT NULL REFERENCES professional_profiles(id),
+    client_profile_id BIGINT NOT NULL REFERENCES profiles(id),
+    service_id BIGINT REFERENCES professional_services(id),
+    
+    appointment_date DATE NOT NULL,
+    start_time TIME NOT NULL,
+    end_time TIME NOT NULL,
+    
+    is_first_visit BOOLEAN DEFAULT TRUE,
+    status professional_appointment_status DEFAULT 'pending',
+    
+    created_at TIMESTAMPTZ DEFAULT NOW(),
+    updated_at TIMESTAMPTZ DEFAULT NOW()
+);
+
+-- Testimonios validados
+CREATE TABLE professional_reviews (
+    id BIGINT GENERATED BY DEFAULT AS IDENTITY PRIMARY KEY,
+    professional_appointment_id BIGINT UNIQUE REFERENCES professional_appointments(id),
+    professional_profile_id BIGINT NOT NULL REFERENCES professional_profiles(id),
+    client_profile_id BIGINT NOT NULL REFERENCES profiles(id),
+    
+    rating INTEGER NOT NULL CHECK (rating BETWEEN 1 AND 5),
+    comment TEXT,
+    created_at TIMESTAMPTZ DEFAULT NOW()
+);
 ```
 
 ---
 
-### HU-7.3: Formatos Industriales
+### HU-7.5: Beneficios Tienda para Profesionales (Descuentos)
 
-**User Story:** Como profesional, quiero comprar sacos de 15kg o más.
+**User Story:** Como profesional habilitado en el Directorio, quiero acceder automáticamente a precios mayoristas al comprar en la tienda MasKot.
 
 **Criterios de Aceptación:**
 
-- [ ] Productos con presentaciones: 2kg, 4kg, 15kg, 25kg
-- [ ] Selector de formato en ficha de producto
-- [ ] Precio por kilo visible
-- [ ] Stock diferenciado por formato
-- [ ] Información de empaque industrial
-- [ ] Tiempo de entrega extendido para formatos grandes
+- [ ] Si el usuario tiene un perfil asociado en `professional_profiles` con `status = 'approved'`, la tienda renderiza la vista mayorista.
+- [ ] Aplicación de `professional_discount_pct` extraído de la tabla `products`.
+- [ ] Formatos Industriales compatibles dinámicamente con el descuento.
 
-**Frontend:** `src/features/b2b/components/IndustrialFormatSelector.tsx`
+**Frontend:** `src/features/store/hooks/useProfessionalDiscount.ts`
 
-**Supabase (`07_b2b_professional`):**
+**Supabase (`07_professional_directory`):**
 
 ```sql
--- Nota: Los formatos industriales se manejan en el campo weight_options (JSONB) de la tabla products
--- Ejemplo de estructura:
--- [
---   {"weight_kg": 2, "price": 45.00, "stock": 100, "is_b2b": false},
---   {"weight_kg": 15, "price": 280.00, "stock": 50, "is_b2b": true},
---   {"weight_kg": 25, "price": 425.00, "stock": 30, "is_b2b": true}
--- ]
-
--- No se requieren tablas adicionales para esta HU
+-- Lógica inyectada en las Queries de Catálogo y Carrito evaluando el rol del perfil autenticado,
+-- multiplicando "variant_price * (1 - (professional_discount_pct / 100))"
 ```
 
 ---
@@ -1717,7 +2076,7 @@ supabase/
 - HU-3.1: Checkout simplificado
 - HU-4.1, 4.2: Legal + Libro Reclamaciones
 - HU-6.1: Autenticación
-- **HU-7.1, 7.2: Registro y Catálogo B2B** ⭐
+- **HU-7.2, 7.3: Registro y Catálogo B2B** ⭐
 
 ### Should Have
 
@@ -1730,7 +2089,8 @@ supabase/
 
 - HU-1.2, 1.3: Nosotros y Blog
 - HU-6.3: Referidos
-- **HU-7.3: Formatos Industriales** ⭐
+- **HU-7.1: Landing Page del Directorio Profesional** ⭐
+- **HU-7.4: Formatos Industriales** ⭐
 
 ---
 

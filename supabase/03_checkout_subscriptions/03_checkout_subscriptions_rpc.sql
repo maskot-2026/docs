@@ -682,6 +682,7 @@ BEGIN
                     'next_billing_date',    s.next_billing_date,
                     'payment_token_id',     s.payment_token_id,
                     'mp_card_id',           pt.token_id,
+                    'customer_id',          pt.customer_id,
                     'card_brand',           pt.card_brand,
                     'shipping_address_id',  s.shipping_address_id,
                     'billing_profile_id',   s.billing_profile_id

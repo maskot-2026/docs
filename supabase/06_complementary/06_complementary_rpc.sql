@@ -44,8 +44,8 @@ BEGIN
           AND p.deleted_at IS NULL
           AND (
               r.name = p_required_role                                    -- Tiene el rol exacto
-              OR (p_required_role = 'user' AND r.name IN ('b2b', 'admin'))-- 'b2b' y 'admin' heredan de 'user'
-              OR (p_required_role = 'b2b' AND r.name = 'admin')           -- 'admin' hereda de 'b2b'
+              OR (p_required_role = 'user' AND r.name IN ('professional', 'admin'))-- 'professional' y 'admin' heredan de 'user'
+              OR (p_required_role = 'professional' AND r.name = 'admin')           -- 'admin' hereda de 'professional'
               OR r.name = 'admin'                                         -- 'admin' tiene todos los permisos
           )
     );
