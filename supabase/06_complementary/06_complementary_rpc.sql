@@ -9,12 +9,29 @@ CREATE OR REPLACE FUNCTION handle_new_user_registration()
 RETURNS TRIGGER AS $$
 DECLARE
     v_profile_id BIGINT;
+    v_username   TEXT;
+    v_full_name  TEXT;
 BEGIN
-    -- Crear perfil desde metadata
-    INSERT INTO profiles (user_id, full_name, avatar_url)
+    -- Resolver username:
+    --   • Registro por email → viene en raw_user_meta_data->>'username'
+    --   • OAuth (Google)     → se auto-genera como user_ + 8 chars random hex
+    v_username := COALESCE(
+        NULLIF(TRIM(NEW.raw_user_meta_data->>'username'), ''),
+        'user_' || encode(gen_random_bytes(4), 'hex')
+    );
+
+    -- Resolver full_name (siempre disponible en ambos flujos)
+    v_full_name := COALESCE(
+        NULLIF(TRIM(NEW.raw_user_meta_data->>'full_name'), ''),
+        v_username
+    );
+
+    -- Crear perfil
+    INSERT INTO profiles (user_id, username, full_name, avatar_url)
     VALUES (
         NEW.id,
-        NEW.raw_user_meta_data->>'full_name',
+        v_username,
+        v_full_name,
         NEW.raw_user_meta_data->>'avatar_url'
     ) RETURNING id INTO v_profile_id;
     
