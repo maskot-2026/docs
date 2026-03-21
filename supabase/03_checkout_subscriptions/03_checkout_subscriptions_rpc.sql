@@ -1,28 +1,3 @@
--- ============================================================================
--- MIGRATION: subscriptions FK constraints → SET NULL (nullable)
--- Ejecutar ANTES de actualizar las RPC si se migra desde RESTRICT.
--- Permite eliminar tarjetas/direcciones/perfiles cuando la suscripción está
--- cancelada, preservando el registro histórico con FKs nulas.
--- ============================================================================
--- ALTER TABLE subscriptions
---     ALTER COLUMN shipping_address_id DROP NOT NULL,
---     ALTER COLUMN billing_profile_id  DROP NOT NULL,
---     ALTER COLUMN payment_token_id    DROP NOT NULL;
---
--- ALTER TABLE subscriptions
---     DROP CONSTRAINT subscriptions_shipping_address_id_fkey,
---     DROP CONSTRAINT subscriptions_billing_profile_id_fkey,
---     DROP CONSTRAINT subscriptions_payment_token_id_fkey;
---
--- ALTER TABLE subscriptions
---     ADD CONSTRAINT subscriptions_shipping_address_id_fkey
---         FOREIGN KEY (shipping_address_id) REFERENCES shipping_addresses(id) ON DELETE SET NULL,
---     ADD CONSTRAINT subscriptions_billing_profile_id_fkey
---         FOREIGN KEY (billing_profile_id) REFERENCES billing_profiles(id) ON DELETE SET NULL,
---     ADD CONSTRAINT subscriptions_payment_token_id_fkey
---         FOREIGN KEY (payment_token_id) REFERENCES payment_tokens(id) ON DELETE SET NULL;
--- ============================================================================
-
 CREATE OR REPLACE FUNCTION create_order(
     p_cart_id BIGINT,
     p_shipping_address JSONB,          -- Inline snapshot: {recipient_name, phone, address_line1, address_line2, district, department}
@@ -52,11 +27,14 @@ BEGIN
         END IF;
     END IF;
 
-    -- 2. Validar Carrito
+    -- 2. Validar Carrito (con session_id para guests para evitar acceso cruzado)
     IF v_profile_id IS NOT NULL THEN
         SELECT * INTO v_cart FROM carts WHERE id = p_cart_id AND profile_id = v_profile_id;
     ELSE
-        SELECT * INTO v_cart FROM carts WHERE id = p_cart_id AND profile_id IS NULL;
+        IF p_cart_session_id IS NULL OR p_cart_session_id = '' THEN
+            RAISE EXCEPTION 'Se requiere cart_session_id para compras de invitado';
+        END IF;
+        SELECT * INTO v_cart FROM carts WHERE id = p_cart_id AND profile_id IS NULL AND session_id = p_cart_session_id;
     END IF;
 
     IF NOT FOUND OR jsonb_array_length(v_cart.items) = 0 THEN
@@ -401,7 +379,7 @@ EXECUTE FUNCTION log_subscription_history();
 -- ============================================================================
 -- 6. Conversión Automática de Orden a Suscripción post-pago
 -- ============================================================================
-CREATE OR REPLACE FUNCTION create_subscription_from_order(
+CREATE OR REPLACE FUNCTION create_subscriptions_from_order(
     p_order_id BIGINT,
     p_payment_token_id BIGINT
 ) RETURNS JSONB AS $$
@@ -522,6 +500,64 @@ BEGIN
 END;
 $$ LANGUAGE plpgsql SECURITY DEFINER;
 
+-- ============================================================================
+-- RPC: Cancelar suscripciones vinculadas a una orden reembolsada
+-- Es la inversa de create_subscriptions_from_order.
+-- Busca order_items con is_subscription=true, luego cancela las suscripciones
+-- activas/pausadas del mismo profile_id + product_id.
+-- ============================================================================
+CREATE OR REPLACE FUNCTION cancel_subscriptions_for_order(
+    p_order_id BIGINT
+) RETURNS JSONB AS $$
+DECLARE
+    v_order RECORD;
+    v_sub_id BIGINT;
+    v_subs_cancelled INTEGER := 0;
+BEGIN
+    -- 1. Buscar la orden
+    SELECT * INTO v_order FROM orders WHERE id = p_order_id;
+    IF NOT FOUND THEN
+        RAISE EXCEPTION 'Orden no encontrada: %', p_order_id;
+    END IF;
+
+    IF v_order.profile_id IS NULL THEN
+        RETURN jsonb_build_object('subscriptions_cancelled', 0);
+    END IF;
+
+    -- 2. Buscar suscripciones activas/pausadas que coincidan con los items de suscripción
+    FOR v_sub_id IN (
+        SELECT s.id
+        FROM subscriptions s
+        JOIN order_items oi ON oi.order_id = p_order_id
+                           AND oi.is_subscription = TRUE
+                           AND oi.product_id = s.product_id
+        WHERE s.profile_id = v_order.profile_id
+          AND s.status IN ('active', 'paused')
+    )
+    LOOP
+        -- 3. Cancelar cada suscripción
+        UPDATE subscriptions
+        SET status = 'cancelled',
+            updated_at = NOW()
+        WHERE id = v_sub_id;
+
+        -- 4. Registrar en historial
+        INSERT INTO subscription_history (subscription_id, action, details)
+        VALUES (
+            v_sub_id,
+            'cancelled_by_refund',
+            jsonb_build_object(
+                'reason', 'Orden reembolsada',
+                'order_id', p_order_id
+            )
+        );
+        v_subs_cancelled := v_subs_cancelled + 1;
+    END LOOP;
+
+    RETURN jsonb_build_object('subscriptions_cancelled', v_subs_cancelled);
+END;
+$$ LANGUAGE plpgsql SECURITY DEFINER;
+
 
 -- ============================================================================
 -- RPC: Limpiar carrito después de confirmar el pago
@@ -612,11 +648,18 @@ BEGIN
         WHERE id = v_item.product_id;
     END LOOP;
 
-    -- Revertir cupón si había
-    UPDATE coupons SET used_count = GREATEST(used_count - 1, 0) 
-    WHERE id IN (
-        SELECT coupon_id FROM carts WHERE profile_id = v_order.profile_id
-    ) AND v_order.profile_id IS NOT NULL;
+    -- Revertir cupón si había (soporta tanto usuarios autenticados como guests)
+    IF v_order.profile_id IS NOT NULL THEN
+        UPDATE coupons SET used_count = GREATEST(used_count - 1, 0) 
+        WHERE id IN (
+            SELECT coupon_id FROM carts WHERE profile_id = v_order.profile_id AND coupon_id IS NOT NULL
+        );
+    ELSIF v_order.cart_session_id IS NOT NULL THEN
+        UPDATE coupons SET used_count = GREATEST(used_count - 1, 0) 
+        WHERE id IN (
+            SELECT coupon_id FROM carts WHERE session_id = v_order.cart_session_id AND coupon_id IS NOT NULL
+        );
+    END IF;
 END;
 $$ LANGUAGE plpgsql SECURITY DEFINER;
 
@@ -704,6 +747,22 @@ END;
 $$ LANGUAGE plpgsql SECURITY DEFINER;
 
 
+-- ============================================================================
+-- RPC: Avanzar fecha de cobro de suscripción (post-renovación aprobada)
+-- Usa NOW() de PostgreSQL para consistencia con pg_cron y cancel_expired.
+-- ============================================================================
+CREATE OR REPLACE FUNCTION advance_subscription_billing(
+    p_subscription_id BIGINT,
+    p_frequency_days INTEGER
+) RETURNS void AS $$
+BEGIN
+    UPDATE subscriptions
+    SET status = 'active',
+        next_billing_date = NOW() + (p_frequency_days || ' days')::INTERVAL,
+        updated_at = NOW()
+    WHERE id = p_subscription_id;
+END;
+$$ LANGUAGE plpgsql SECURITY DEFINER;
 
 
 -- ============================================================================
