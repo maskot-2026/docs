@@ -20,6 +20,11 @@ CREATE OR REPLACE FUNCTION create_professional_account_request(
 DECLARE
     v_account_id BIGINT;
 BEGIN
+    -- Validar identidad de ejecución (Frontend security)
+    IF NOT EXISTS (SELECT 1 FROM profiles WHERE id = p_profile_id AND user_id = auth.uid()) THEN
+        RAISE EXCEPTION 'No autorizado para crear perfil profesional para este usuario';
+    END IF;
+
     -- Validar formato de RUC (11 dígitos)
     IF LENGTH(p_ruc) != 11 OR p_ruc !~ '^[0-9]+$' THEN
         RETURN jsonb_build_object(
@@ -105,6 +110,11 @@ RETURNS TABLE (
     stock_quantity INTEGER
 ) AS $$
 BEGIN
+    -- Validar identidad de ejecución (solo el profesional dueño puede acceder a sus precios B2B)
+    IF NOT EXISTS (SELECT 1 FROM profiles WHERE id = p_profile_id AND user_id = auth.uid()) THEN
+        RAISE EXCEPTION 'No autorizado para acceder a este catálogo profesional';
+    END IF;
+
     -- Validar que usuario tenga cuenta Profesional aprobada
     IF NOT EXISTS (
         SELECT 1 FROM professional_profiles
@@ -141,6 +151,11 @@ RETURNS JSONB AS $$
 DECLARE
     v_account RECORD;
 BEGIN
+    -- Validar identidad de ejecución (Frontend security)
+    IF NOT EXISTS (SELECT 1 FROM profiles WHERE id = p_profile_id AND user_id = auth.uid()) THEN
+        RAISE EXCEPTION 'No autorizado para verificar elegibilidad de este perfil';
+    END IF;
+
     -- Buscar cuenta del usuario
     SELECT * INTO v_account 
     FROM professional_profiles 
@@ -179,7 +194,7 @@ BEGIN
         );
     END IF;
 END;
-$$ LANGUAGE plpgsql SECURITY INVOKER;
+$$ LANGUAGE plpgsql SECURITY DEFINER;
 
 -- ============================================================================
 -- Admin RPCs (para Gestión de Directorio Profesional)
@@ -193,6 +208,11 @@ CREATE OR REPLACE FUNCTION approve_professional_account(
 DECLARE
     v_account RECORD;
 BEGIN
+    -- Validar rol de administrador
+    IF NOT auth_has_role('admin') THEN
+        RAISE EXCEPTION 'Acceso denegado: Se requiere rol de administrador';
+    END IF;
+
     -- Obtener cuenta
     SELECT * INTO v_account FROM professional_profiles WHERE id = p_account_id;
     
@@ -233,6 +253,11 @@ CREATE OR REPLACE FUNCTION reject_professional_account(
 DECLARE
     v_account RECORD;
 BEGIN
+    -- Validar rol de administrador
+    IF NOT auth_has_role('admin') THEN
+        RAISE EXCEPTION 'Acceso denegado: Se requiere rol de administrador';
+    END IF;
+
     -- Validar motivo
     IF p_reason IS NULL OR TRIM(p_reason) = '' THEN
         RAISE EXCEPTION 'Debe proporcionar un motivo de rechazo';
@@ -274,6 +299,11 @@ DECLARE
     v_account RECORD;
     v_new_status VARCHAR;
 BEGIN
+    -- Validar rol de administrador
+    IF NOT auth_has_role('admin') THEN
+        RAISE EXCEPTION 'Acceso denegado: Se requiere rol de administrador';
+    END IF;
+
     -- Obtener cuenta
     SELECT * INTO v_account FROM professional_profiles WHERE id = p_account_id;
     

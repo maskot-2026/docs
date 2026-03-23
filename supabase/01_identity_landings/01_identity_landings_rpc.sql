@@ -158,4 +158,4 @@ BEGIN
         'cost_per_day_maskot', ROUND(v_monthly_maskot / 30, 2)
     );
 END;
-$$ LANGUAGE plpgsql SECURITY INVOKER;
+$$ LANGUAGE plpgsql SECURITY DEFINER;

@@ -18,6 +18,10 @@ DECLARE
     v_active_subs INTEGER;
     v_mrr NUMERIC;
 BEGIN
+    IF NOT auth_has_role('admin') THEN
+        RAISE EXCEPTION 'Acceso denegado: Se requiere rol de administrador';
+    END IF;
+
     -- Ventas aprobadas y ordenes confirmadas
     SELECT COALESCE(SUM(total), 0), COUNT(*) INTO v_total_sales, v_approved_orders
     FROM orders
@@ -74,6 +78,10 @@ CREATE OR REPLACE FUNCTION get_sales_evolution(
 DECLARE
     v_format TEXT;
 BEGIN
+    IF NOT auth_has_role('admin') THEN
+        RAISE EXCEPTION 'Acceso denegado: Se requiere rol de administrador';
+    END IF;
+
     -- Determinar formato según granularidad
     v_format := CASE p_granularity
         WHEN 'hour' THEN 'YYYY-MM-DD HH24:00'

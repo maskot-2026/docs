@@ -34,6 +34,16 @@ BEGIN
         RAISE EXCEPTION 'Carrito no encontrado';
     END IF;
 
+    -- 1.5 Validar propiedad del carrito (Si pertenece a un usuario, no permitir que otro lo lea)
+    IF v_cart.profile_id IS NOT NULL AND auth.uid() IS NOT NULL THEN
+        IF NOT EXISTS (SELECT 1 FROM profiles WHERE id = v_cart.profile_id AND user_id = auth.uid()) AND NOT auth_has_role('admin') THEN
+            RAISE EXCEPTION 'No autorizado para calcular este carrito';
+        END IF;
+    ELSIF v_cart.profile_id IS NOT NULL AND auth.uid() IS NULL THEN
+        RAISE EXCEPTION 'Debe iniciar sesión para calcular este carrito';
+    END IF;
+    -- Los carritos de guest (profile_id IS NULL) son calculables públicamente asumiendo que el frontend controla el session_id
+
     -- 2. Calcular subtotal (solo items seleccionados, por defecto true)
     FOR v_item IN SELECT * FROM jsonb_array_elements(v_cart.items)
     LOOP
@@ -126,4 +136,4 @@ BEGIN
         'applied_coupon', v_applied_coupon_code
     );
 END;
-$$ LANGUAGE plpgsql SECURITY INVOKER;
+$$ LANGUAGE plpgsql SECURITY DEFINER;

@@ -179,12 +179,13 @@ DECLARE
     v_sub RECORD;
     v_pause_until TIMESTAMPTZ := NULL;
 BEGIN
-    -- 1. Validar propiedad (Omitido auth.uid() para desarrollo)
+    -- 1. Validar propiedad
     SELECT s.* INTO v_sub FROM subscriptions s
-    WHERE s.id = p_subscription_id;
+    JOIN profiles p ON p.id = s.profile_id
+    WHERE s.id = p_subscription_id AND p.user_id = auth.uid();
 
     IF NOT FOUND THEN
-        RAISE EXCEPTION 'Suscripción no encontrada';
+        RAISE EXCEPTION 'Suscripción no encontrada o sin acceso autorizado';
     END IF;
 
     -- Si el estado es el mismo, no hacer nada
@@ -379,7 +380,7 @@ EXECUTE FUNCTION log_subscription_history();
 -- ============================================================================
 -- 6. Conversión Automática de Orden a Suscripción post-pago
 -- ============================================================================
-CREATE OR REPLACE FUNCTION create_subscriptions_from_order(
+CREATE OR REPLACE FUNCTION create_subscriptions_for_order(
     p_order_id BIGINT,
     p_payment_token_id BIGINT
 ) RETURNS JSONB AS $$
@@ -912,3 +913,16 @@ BEGIN
     DELETE FROM billing_profiles WHERE id = p_profile_id;
 END;
 $$ LANGUAGE plpgsql SECURITY DEFINER;
+
+
+-- ============================================================================
+-- 9. SEGURIDAD: RESTRICT INTERNAL FUNCTIONS FROM PUBLIC APIS
+-- Las siguientes funciones solo pueden ejecutarse internamente o vía service_role
+-- ============================================================================
+REVOKE EXECUTE ON FUNCTION create_subscriptions_for_order(BIGINT, BIGINT) FROM PUBLIC, authenticated, anon;
+REVOKE EXECUTE ON FUNCTION cancel_subscriptions_for_order(BIGINT) FROM PUBLIC, authenticated, anon;
+REVOKE EXECUTE ON FUNCTION clear_order_cart(BIGINT) FROM PUBLIC, authenticated, anon;
+REVOKE EXECUTE ON FUNCTION restore_order_stock(BIGINT) FROM PUBLIC, authenticated, anon;
+REVOKE EXECUTE ON FUNCTION advance_subscription_billing(BIGINT, INTEGER) FROM PUBLIC, authenticated, anon;
+REVOKE EXECUTE ON FUNCTION cancel_expired_pending_orders() FROM PUBLIC, authenticated, anon;
+REVOKE EXECUTE ON FUNCTION get_due_subscriptions() FROM PUBLIC, authenticated, anon;
