@@ -1,5 +1,5 @@
 -- ============================================================================
--- MasKot | Identity & Landings Module (01_identity_landings_rls.sql)
+-- MassKot | Identity & Landings Module (01_identity_landings_rls.sql)
 -- Phase 3: RLS Policies & Security
 -- ============================================================================
 

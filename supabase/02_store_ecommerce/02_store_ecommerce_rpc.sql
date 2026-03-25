@@ -1,6 +1,6 @@
 -- Content from store_rpc.sql
 -- ============================================================================
--- MasKot | Store Module (store_rpc.sql)
+-- MassKot | Store Module (store_rpc.sql)
 -- RPC Implementations
 -- ============================================================================
 
@@ -124,16 +124,25 @@ BEGIN
         END IF;
     END IF;
 
-    -- 5. Retornar totales
-    RETURN jsonb_build_object(
-        'subtotal', ROUND(v_subtotal, 2),
-        'shipping_cost', ROUND(v_shipping_cost, 2),
-        'discount', ROUND(v_discount, 2),
-        'total', GREATEST(0, ROUND(v_subtotal + v_shipping_cost - v_discount, 2)),
-        'delivery_days', v_delivery_days,
-        'has_free_shipping', v_has_free_shipping,
-        'coupon_error', v_coupon_error,
-        'applied_coupon', v_applied_coupon_code
-    );
+    -- 5. Retornar totales con desglose de IGV
+    -- Estrategia: Precios con IGV incluido (18%) → extracción al retornar
+    DECLARE
+        v_total NUMERIC := GREATEST(0, ROUND(v_subtotal + v_shipping_cost - v_discount, 2));
+        v_taxable_base NUMERIC := ROUND(v_total / 1.18, 2);  -- base_imponible
+        v_igv_amount NUMERIC := ROUND(v_total - ROUND(v_total / 1.18, 2), 2);  -- igv 18%
+    BEGIN
+        RETURN jsonb_build_object(
+            'subtotal', ROUND(v_subtotal, 2),
+            'shipping_cost', ROUND(v_shipping_cost, 2),
+            'discount', ROUND(v_discount, 2),
+            'total', v_total,
+            'taxable_base', v_taxable_base,
+            'igv_amount', v_igv_amount,
+            'delivery_days', v_delivery_days,
+            'has_free_shipping', v_has_free_shipping,
+            'coupon_error', v_coupon_error,
+            'applied_coupon', v_applied_coupon_code
+        );
+    END;
 END;
 $$ LANGUAGE plpgsql SECURITY DEFINER;

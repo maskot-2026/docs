@@ -1,5 +1,5 @@
 -- ============================================================================
--- MasKot | Professional Directory Module (07_professional_directory_rls.sql)
+-- MassKot | Professional Directory Module (07_professional_directory_rls.sql)
 -- Phase 3: RLS Policies & Security
 -- ============================================================================
 

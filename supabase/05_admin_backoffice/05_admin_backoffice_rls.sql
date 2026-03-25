@@ -1,5 +1,5 @@
 -- ============================================================================
--- MasKot | Admin Backoffice Module (05_admin_backoffice_rls.sql)
+-- MassKot | Admin Backoffice Module (05_admin_backoffice_rls.sql)
 -- Phase 3: RLS Policies & Security
 -- ============================================================================
 

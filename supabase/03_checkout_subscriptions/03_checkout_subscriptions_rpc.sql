@@ -1,3 +1,23 @@
+-- ============================================================================
+-- Migration: Columnas IGV y comprobante en orders
+-- ============================================================================
+ALTER TABLE orders ADD COLUMN IF NOT EXISTS taxable_base NUMERIC(10, 2);   -- base imponible sin IGV (nullable por ahora)
+ALTER TABLE orders ADD COLUMN IF NOT EXISTS igv_amount NUMERIC(10, 2);     -- monto del IGV 18% (nullable por ahora)
+ALTER TABLE orders ADD COLUMN IF NOT EXISTS invoice_url TEXT;               -- PDF Nubefact
+ALTER TABLE orders ADD COLUMN IF NOT EXISTS invoice_series TEXT;            -- ej. B001, F001
+ALTER TABLE orders ADD COLUMN IF NOT EXISTS invoice_number INTEGER;         -- correlativo
+ALTER TABLE orders ADD COLUMN IF NOT EXISTS invoice_issued_at TIMESTAMPTZ; -- timestamp emisión SUNAT
+
+-- Backfill para filas previas (ejecutar antes de aplicar NOT NULL cuando se decida)
+UPDATE orders
+SET taxable_base = ROUND(total / 1.18, 2),
+    igv_amount   = ROUND(total - ROUND(total / 1.18, 2), 2)
+WHERE taxable_base IS NULL;
+
+-- Aplicar NOT NULL ahora que create_order siempre rellena ambos campos
+ALTER TABLE orders ALTER COLUMN taxable_base SET NOT NULL;
+ALTER TABLE orders ALTER COLUMN igv_amount   SET NOT NULL;
+
 CREATE OR REPLACE FUNCTION create_order(
     p_cart_id BIGINT,
     p_shipping_address JSONB,          -- Inline snapshot: {recipient_name, phone, address_line1, address_line2, district, department}
@@ -15,6 +35,8 @@ DECLARE
     v_discount NUMERIC;
     v_shipping_cost NUMERIC;
     v_total NUMERIC;
+    v_taxable_base NUMERIC;
+    v_igv_amount NUMERIC;
     v_district TEXT;
     v_auth_uid UUID := auth.uid();
     v_profile_id BIGINT := NULL;
@@ -69,6 +91,9 @@ BEGIN
     v_discount := (v_totals->>'discount')::NUMERIC;
     v_shipping_cost := (v_totals->>'shipping_cost')::NUMERIC;
     v_total := (v_totals->>'total')::NUMERIC;
+    -- Extracción IGV (precios incluyen 18%)
+    v_taxable_base := ROUND(v_total / 1.18, 2);
+    v_igv_amount := ROUND(v_total - v_taxable_base, 2);
 
     -- 5. Validar stock ANTES de tocar cupón u orden (fail-fast)
     FOR v_item IN SELECT * FROM jsonb_array_elements(v_cart.items)
@@ -108,9 +133,11 @@ BEGIN
     -- 7. Crear la orden central
     INSERT INTO orders (
         profile_id, cart_session_id, status, subtotal, discount, shipping_cost, total,
+        taxable_base, igv_amount,
         shipping_address, billing_profile, payment_status, contact_email, checkout_id
     ) VALUES (
         v_profile_id, p_cart_session_id, 'pending', v_subtotal, v_discount, v_shipping_cost, v_total,
+        v_taxable_base, v_igv_amount,
         p_shipping_address, COALESCE(p_billing_profile, '{}'::jsonb),
         'pending', p_contact_email, p_checkout_id
     ) RETURNING id INTO v_order_id;
@@ -157,6 +184,8 @@ BEGIN
     RETURN jsonb_build_object(
         'order_id', v_order_id,
         'total', v_total,
+        'taxable_base', v_taxable_base,
+        'igv_amount', v_igv_amount,
         'profile_id', v_profile_id
     );
 END;
@@ -925,4 +954,4 @@ REVOKE EXECUTE ON FUNCTION clear_order_cart(BIGINT) FROM PUBLIC, authenticated, 
 REVOKE EXECUTE ON FUNCTION restore_order_stock(BIGINT) FROM PUBLIC, authenticated, anon;
 REVOKE EXECUTE ON FUNCTION advance_subscription_billing(BIGINT, INTEGER) FROM PUBLIC, authenticated, anon;
 REVOKE EXECUTE ON FUNCTION cancel_expired_pending_orders() FROM PUBLIC, authenticated, anon;
-REVOKE EXECUTE ON FUNCTION get_due_subscriptions() FROM PUBLIC, authenticated, anon;
+REVOKE EXECUTE ON FUNCTION get_due_subscriptions() FROM PUBLIC, authenticated, anon;

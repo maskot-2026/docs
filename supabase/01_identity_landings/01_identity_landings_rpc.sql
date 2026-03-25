@@ -1,5 +1,5 @@
 -- ============================================================================
--- MasKot | CMS Module (cms_rpc.sql)
+-- MassKot | CMS Module (cms_rpc.sql)
 -- RPC: Calculadora Nutricional Definitiva con Fórmula RER Veterinaria
 -- ============================================================================
 
@@ -20,16 +20,19 @@ DECLARE
 
     -- Densidad calórica (Kcal por gramo)
     v_traditional_kcal_per_g NUMERIC;
-    v_maskot_kcal_per_g NUMERIC;
+    v_masskot_kcal_per_g NUMERIC;
 
-    -- Precios por Kg (mercado peruano)
+    -- Precios por KG
     v_traditional_price_per_kg NUMERIC;
-    v_maskot_price_per_kg NUMERIC;
+    v_masskot_price_per_kg NUMERIC;
 
     v_daily_grams_traditional NUMERIC;
+    -- Variables cálculo final
     v_monthly_traditional NUMERIC;
-    v_monthly_maskot NUMERIC;
+    v_monthly_masskot NUMERIC;
     v_savings_monthly NUMERIC;
+    v_savings_yearly NUMERIC;
+    v_savings_pct NUMERIC;
 BEGIN
     -- =========================================================================
     -- 1. RER: Fórmula veterinaria estándar (NRC 2006)
@@ -109,53 +112,58 @@ BEGIN
 
     -- Densidad calórica por tipo de alimento (Kcal/g)
     IF p_pet_type = 'cat' THEN
-        v_traditional_kcal_per_g := 3.5;  -- Croqueta premium gato
-        v_maskot_kcal_per_g := 4.2;       -- Alimento natural gato (más denso)
-        v_traditional_price_per_kg := 45.00; -- S/ 45/kg (Royal Canin gato, ProPlan)
-        v_maskot_price_per_kg := 32.00;      -- S/ 32/kg (tu producto gato)
+        v_traditional_kcal_per_g := 3.5;  -- Promedio croqueta gato
+        v_masskot_kcal_per_g := 4.2;       -- Alimento natural gato (más denso)
+        v_traditional_price_per_kg := 25.00; -- S/ 25/kg (Premium comercial)
+        v_masskot_price_per_kg := 32.00;      -- S/ 32/kg (tu producto gato)
     ELSE
-        v_traditional_kcal_per_g := 3.8;  -- Croqueta super-premium perro
-        v_maskot_kcal_per_g := 4.0;       -- Alimento natural perro
-        v_traditional_price_per_kg := 38.00; -- S/ 38/kg (ProPlan, Royal Canin)
-        v_maskot_price_per_kg := 28.50;      -- S/ 28.50/kg (tu producto perro)
+        v_traditional_kcal_per_g := 3.2;  -- Promedio croqueta perro
+        v_masskot_kcal_per_g := 4.0;       -- Alimento natural perro
+        v_traditional_price_per_kg := 22.00; -- S/ 22/kg (Premium comercial)
+        v_masskot_price_per_kg := 28.50;      -- S/ 28.50/kg (tu producto perro)
     END IF;
 
-    -- Gramos diarios = Kcal necesarias / Kcal por gramo
-    v_daily_grams := v_mer / v_maskot_kcal_per_g;
+    -- 5. Calcular gramos diarios necesarios para dieta MassKot
+    v_daily_grams := v_mer / v_masskot_kcal_per_g;
     v_daily_grams_traditional := v_mer / v_traditional_kcal_per_g;
 
     -- =========================================================================
     -- 5. Calcular costos mensuales
     -- =========================================================================
-    v_monthly_traditional := ROUND((v_daily_grams_traditional * 30 / 1000) * v_traditional_price_per_kg, 2);
-    v_monthly_maskot := ROUND((v_daily_grams * 30 / 1000) * v_maskot_price_per_kg, 2);
+    v_monthly_masskot := ROUND((v_daily_grams * 30 / 1000) * v_masskot_price_per_kg, 2);
 
-    -- Pisos mínimos realistas
-    v_monthly_traditional := GREATEST(v_monthly_traditional, 40.00);
-    v_monthly_maskot := GREATEST(v_monthly_maskot, 30.00);
+    -- Regla de negocio: Ticket mínimo S/ 30.00
+    -- (Ej: gatos muy pequeños o perros miniatura)
+    v_monthly_masskot := GREATEST(v_monthly_masskot, 30.00);
 
-    -- =========================================================================
-    -- 6. Cálculo final
-    -- =========================================================================
-    v_savings_monthly := ROUND(v_monthly_traditional - v_monthly_maskot, 2);
+    -- 8. Costo mensual tradicional
+    -- Se asume p.ej. 20% más volumen diario debido a menor densidad calórica y fillers.
+    v_monthly_traditional := ROUND((v_daily_grams * 1.2 * 30 / 1000) * v_traditional_price_per_kg, 2);
 
-    -- Garantía comercial: siempre mostrar ahorro mínimo del 10%
+    v_savings_monthly := ROUND(v_monthly_traditional - v_monthly_masskot, 2);
+
+    -- Regla de negocio: Asegurar que siempre se muestre un "ahorro"
+    -- Si el tradicional da menor precio que MassKot, ajustamos el tradicional para fines de marketing:
     IF v_savings_monthly <= 0 THEN
-        v_monthly_traditional := ROUND(v_monthly_maskot * 1.12, 2);
-        v_savings_monthly := ROUND(v_monthly_traditional - v_monthly_maskot, 2);
+        v_monthly_traditional := ROUND(v_monthly_masskot * 1.12, 2);
+        v_savings_monthly := ROUND(v_monthly_traditional - v_monthly_masskot, 2);
     END IF;
 
+    v_savings_yearly := v_savings_monthly * 12;
+    v_savings_pct := ROUND((v_savings_monthly / v_monthly_traditional) * 100, 2);
+
+    -- 9. Devolver el JSON final
     RETURN jsonb_build_object(
         'life_stage', v_life_stage,
-        'daily_calories', ROUND(v_mer),
-        'daily_grams', ROUND(v_daily_grams),
+        'daily_calories', ROUND(v_mer, 0),
+        'daily_grams', ROUND(v_daily_grams, 0),
         'monthly_traditional', v_monthly_traditional,
-        'monthly_maskot', v_monthly_maskot,
+        'monthly_masskot', v_monthly_masskot,
         'savings_monthly', v_savings_monthly,
-        'savings_yearly', ROUND(v_savings_monthly * 12, 2),
-        'savings_pct', ROUND((v_savings_monthly / v_monthly_traditional) * 100, 1),
+        'savings_yearly', v_savings_yearly,
+        'savings_pct', v_savings_pct,
         'cost_per_day_traditional', ROUND(v_monthly_traditional / 30, 2),
-        'cost_per_day_maskot', ROUND(v_monthly_maskot / 30, 2)
+        'cost_per_day_masskot', ROUND(v_monthly_masskot / 30, 2)
     );
 END;
-$$ LANGUAGE plpgsql SECURITY DEFINER;
+$$ LANGUAGE plpgsql STABLE SECURITY DEFINER;

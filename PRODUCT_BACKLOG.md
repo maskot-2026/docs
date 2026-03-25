@@ -807,7 +807,10 @@ CREATE OR REPLACE FUNCTION calculate_cart_totals(
     p_district TEXT,
     p_coupon_code TEXT DEFAULT NULL
 ) RETURNS JSONB AS $$
-    -- Retorna: { subtotal, shipping_cost, discount, total, delivery_days, has_free_shipping, coupon_error, applied_coupon }
+    -- Retorna: { subtotal, shipping_cost, discount, total,
+    --           taxable_base, igv_amount,  ← IGV 18% extraído del total
+    --           delivery_days, has_free_shipping, coupon_error, applied_coupon }
+    -- Estrategia: precios con IGV incluido → taxable_base = ROUND(total / 1.18, 2)
 $$ LANGUAGE plpgsql SECURITY INVOKER;
 ```
 
@@ -891,7 +894,6 @@ CREATE TABLE payment_tokens (
     customer_id TEXT NOT NULL,     -- ID del customer en la pasarela de pago — requerido para generar tokens MIT en cobros futuros
     last_four TEXT NOT NULL,
     card_brand card_brand NOT NULL,
-    expires_at TIMESTAMPTZ,
     is_default BOOLEAN NOT NULL DEFAULT FALSE,
     created_at TIMESTAMPTZ NOT NULL DEFAULT NOW(),
     UNIQUE (profile_id, token_id)
@@ -910,15 +912,31 @@ CREATE TABLE orders (
     discount NUMERIC(10, 2) NOT NULL DEFAULT 0 CHECK (discount >= 0),
     shipping_cost NUMERIC(10, 2) NOT NULL DEFAULT 0 CHECK (shipping_cost >= 0),
     total NUMERIC(10, 2) NOT NULL CHECK (total >= 0),
+    taxable_base NUMERIC(10, 2) NOT NULL, -- Base imponible sin IGV (= ROUND(total / 1.18, 2))
+    igv_amount NUMERIC(10, 2) NOT NULL,   -- Monto del IGV 18% (= total - taxable_base)
     shipping_address JSONB NOT NULL DEFAULT '{}',
     billing_profile JSONB NOT NULL DEFAULT '{}', -- Snapshot inmutable de los datos de facturación al momento de la compra
     payment_status payment_status NOT NULL DEFAULT 'pending',
     transaction_id TEXT UNIQUE, -- ID final de la transacción bancaria
     checkout_id TEXT, -- Intención de pago o session ID de la pasarela
     contact_email TEXT NOT NULL,
+    -- Comprobante electrónico (Nubefact / SUNAT)
+    invoice_url TEXT,                     -- URL del PDF emitido por Nubefact
+    invoice_series TEXT,                  -- Serie del comprobante (ej. B001, F001)
+    invoice_number INTEGER,               -- Número correlativo del comprobante
+    invoice_issued_at TIMESTAMPTZ,        -- Fecha/hora de emisión exitosa
     created_at TIMESTAMPTZ NOT NULL DEFAULT NOW(),
     updated_at TIMESTAMPTZ NOT NULL DEFAULT NOW()
 );
+
+-- Migraciones IGV (aplicar sobre tabla existente)
+-- ALTER TABLE orders ADD COLUMN taxable_base NUMERIC(10, 2) NOT NULL;
+-- ALTER TABLE orders ADD COLUMN igv_amount NUMERIC(10, 2) NOT NULL;
+-- ALTER TABLE orders ADD COLUMN invoice_url TEXT;
+-- ALTER TABLE orders ADD COLUMN invoice_series TEXT;
+-- ALTER TABLE orders ADD COLUMN invoice_number INTEGER;
+-- ALTER TABLE orders ADD COLUMN invoice_issued_at TIMESTAMPTZ;
+
 
 -- Items de orden
 CREATE TABLE order_items (
@@ -947,8 +965,9 @@ CREATE OR REPLACE FUNCTION create_order(
     -- 1. Validar stock de cada item (fail-fast antes de tocar nada)
     -- 2. Incrementar cupón (solo si stock OK)
     -- 3. Crear orden + items (con session_id para guests)
+    --    → persiste taxable_base = ROUND(total / 1.18, 2) e igv_amount = total - taxable_base
     -- 4. Reservar stock
-    -- Retorna: { order_id, total }
+    -- Retorna: { order_id, total, taxable_base, igv_amount }
 $$ LANGUAGE plpgsql SECURITY DEFINER;
 
 -- RPC: Limpiar carrito de una orden post-pago
@@ -1110,6 +1129,59 @@ VALUES ({profile_id}, 1, 'Receta Base (Mock)', 'SKU-MOCK-01', '{"peso": "500g"}'
 > **Responsabilidad legal de cobros automáticos:** Técnicamente es posible cobrar al usuario en cualquier momento con el token guardado. Hacerlo sin consentimiento previo constituye **fraude**. Un contracargo exitoso resulta en: devolución al usuario, descuento + multa al comercio, y bloqueo de cuenta MP si el porcentaje supera ~1%. Los tres requisitos para cobros automáticos legítimos son: (1) consentimiento explícito en el checkout, (2) notificación pre-cobro 2-3 días antes, (3) mecanismo de cancelación accesible siempre.
 >
 > **Arquitectura de órdenes huérfanas:** Las órdenes en `payment_status='pending'` que no reciben webhook de MP en 15 minutos son canceladas automáticamente por `cancel_expired_pending_orders()` vía pg_cron (cada 5 min), restaurando stock y cupón. El backend de integración no hace rollback manual — delega esa responsabilidad al cron.
+
+---
+
+### HU-3.3: Gestión de IGV y Facturación Electrónica (SUNAT / Nubefact)
+
+**User Story:** Como negocio, necesito cumplir con la obligación tributaria peruana emitiendo comprobantes electrónicos (boletas y facturas) validados por SUNAT para cada venta aprobada.
+
+**Estrategia:** Precios mostrados con IGV incluido (18%) → extracción al persistir → emisión Nubefact post-pago.
+
+> **Estado actual:** Nubefact está **desactivado** por defecto (`NUBEFACT_ENABLED=false`).
+> Las órdenes acumulan `taxable_base` e `igv_amount` (nullable hasta que Nubefact se active).
+> Para la declaración manual ante SUNAT usar el endpoint de exportación CSV.
+
+**Criterios de Aceptación:**
+
+- [x] El resumen de la orden (carrito y checkout) muestra desglose: **Base imponible** + **IGV 18%**
+- [x] Al crear la orden (RPC `create_order`) se calculan y persisten `taxable_base` e `igv_amount` (fórmula: `taxable_base = ROUND(total / 1.18, 2)`)
+- [x] La tabla `orders` tiene columnas: `taxable_base NUMERIC(10,2)`, `igv_amount NUMERIC(10,2)`, `invoice_url`, `invoice_series`, `invoice_number`, `invoice_issued_at`
+  - _`taxable_base` e `igv_amount` son **nullable** por ahora; se aplicará NOT NULL + backfill cuando se active Nubefact_
+- [x] El RPC `calculate_cart_totals` retorna `taxable_base` e `igv_amount` en el JSONB de respuesta
+- [x] El reporte admin (`get_reports_overview`) incluye métricas `igv_collected` y `taxable_base_total`
+- [x] Post-pago aprobado: el servicio de pagos llama `InvoiceService.emit_invoice(order_id)` **solo si** `NUBEFACT_ENABLED=true` (fire-and-forget — un fallo de Nubefact no revierte el pago)
+- [ ] _(pendiente Nubefact)_ Si `billing_profile.doc_type == "ruc"` → se emite **Factura** (serie `F001`, tipo_comprobante=1)
+- [ ] _(pendiente Nubefact)_ Si `billing_profile.doc_type` es `dni`, `ce` o `passport` → se emite **Boleta** (serie `B001`, tipo_comprobante=2)
+- [ ] _(pendiente Nubefact)_ Los datos del comprobante (URL PDF, serie, número, fecha) se guardan en la orden
+- [x] Endpoint admin `GET /api/v1/admin/billing/orders/export` descarga CSV con desglose IGV para declaración manual SUNAT
+  - Columnas: `orden_id`, `fecha`, `email_contacto`, `tipo_doc`, `num_doc`, `razon_social`, `total`, `base_imponible`, `igv`, `serie_comprobante`, `num_comprobante`
+  - Filtros opcionales: `date_from`, `date_to` (ISO 8601)
+- [x] Endpoint admin `POST /api/v1/admin/billing/orders/{order_id}/invoice` devuelve **503** mientras `NUBEFACT_ENABLED=false`; permite re-emitir comprobantes fallidos cuando esté activo
+
+**Variables de entorno (Integration API):**
+```
+# Poner NUBEFACT_ENABLED=true cuando se esté listo para activar la emisión automática
+NUBEFACT_ENABLED=false
+NUBEFACT_API_URL=https://app.nubefact.com/api/v1
+NUBEFACT_TOKEN=<token_empresa>
+NUBEFACT_RUC=<ruc_empresa>
+NUBEFACT_BOLETA_SERIES=B001
+NUBEFACT_FACTURA_SERIES=F001
+```
+
+**Archivos involucrados:**
+
+- **Frontend:** `src/features/cart/types/cart.types.ts`, `src/features/cart/pages/CartPage.tsx`, `src/features/checkout/pages/CheckoutPage.tsx`
+- **Supabase:** `02_store_ecommerce_rpc.sql` (calculate_cart_totals), `03_checkout_subscriptions_rpc.sql` (create_order + ALTER TABLE migrations), `05_admin_backoffice_rpc.sql` (get_reports_overview)
+- **Integration API:** `app/billing/` (bounded context completo), `app/payments/service/payment_service.py`, `app/payments/domain/model/supabase_models.py`, `app/payments/domain/client/supabase_client.py`, `shared/config/settings.py`, `main.py`
+
+**Nota técnica — Para activar Nubefact en el futuro:**
+1. Añadir credenciales Nubefact al `.env` y poner `NUBEFACT_ENABLED=true`
+2. Aplicar el backfill + NOT NULL comentado en `03_checkout_subscriptions_rpc.sql`
+3. Reemplazar el número correlativo temporal por una secuencia PostgreSQL (`nextval('boleta_b001_seq')`) para garantizar correlativos sin huecos (requisito SUNAT)
+
+
 
 ---
 

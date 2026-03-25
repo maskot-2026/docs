@@ -1,5 +1,5 @@
 -- ============================================================================
--- MasKot | Checkout & Subscriptions Module (03_checkout_subscriptions_rls.sql)
+-- MassKot | Checkout & Subscriptions Module (03_checkout_subscriptions_rls.sql)
 -- Phase 3: RLS Policies & Security
 -- ============================================================================
 

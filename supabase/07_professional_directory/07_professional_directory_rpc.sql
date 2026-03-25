@@ -1,5 +1,5 @@
 -- ============================================================================
--- MasKot | Professional Directory Channel Module (07_professional_directory_rpc.sql)
+-- MassKot | Professional Directory Channel Module (07_professional_directory_rpc.sql)
 -- RPC Implementations - Fase 2
 -- ============================================================================
 

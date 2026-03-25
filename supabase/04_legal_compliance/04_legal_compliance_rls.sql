@@ -1,5 +1,5 @@
 -- ============================================================================
--- MasKot | Legal & Compliance Module (04_legal_compliance_rls.sql)
+-- MassKot | Legal & Compliance Module (04_legal_compliance_rls.sql)
 -- Phase 3: RLS Policies & Security
 -- ============================================================================
 

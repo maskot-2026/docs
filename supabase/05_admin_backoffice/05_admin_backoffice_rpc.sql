@@ -1,6 +1,6 @@
 -- Content from admin_rpc.sql
 -- ============================================================================
--- MasKot | Admin Module (admin_rpc.sql)
+-- MassKot | Admin Module (admin_rpc.sql)
 -- RPC Implementations
 -- ============================================================================
 
@@ -13,6 +13,7 @@ DECLARE
     v_date_from TIMESTAMPTZ := COALESCE(p_date_from, NOW() - INTERVAL '30 days');
     v_date_to TIMESTAMPTZ := COALESCE(p_date_to, NOW());
     v_total_sales NUMERIC;
+    v_igv_collected NUMERIC;
     v_approved_orders INTEGER;
     v_avg_order_value NUMERIC;
     v_active_subs INTEGER;
@@ -22,8 +23,9 @@ BEGIN
         RAISE EXCEPTION 'Acceso denegado: Se requiere rol de administrador';
     END IF;
 
-    -- Ventas aprobadas y ordenes confirmadas
-    SELECT COALESCE(SUM(total), 0), COUNT(*) INTO v_total_sales, v_approved_orders
+    -- Ventas aprobadas y ordenes confirmadas (con IGV desglosado)
+    SELECT COALESCE(SUM(total), 0), COALESCE(SUM(igv_amount), 0), COUNT(*)
+    INTO v_total_sales, v_igv_collected, v_approved_orders
     FROM orders
     WHERE created_at BETWEEN v_date_from AND v_date_to
       AND payment_status = 'approved';
@@ -44,6 +46,8 @@ BEGIN
 
     RETURN jsonb_build_object(
         'total_sales', ROUND(v_total_sales, 2),
+        'igv_collected', ROUND(v_igv_collected, 2),
+        'taxable_base_total', ROUND(v_total_sales - v_igv_collected, 2),
         'approved_orders', v_approved_orders,
         'avg_order_value', ROUND(v_avg_order_value, 2),
         'active_subscriptions', v_active_subs,

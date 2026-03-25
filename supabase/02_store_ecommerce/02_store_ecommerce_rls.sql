@@ -1,5 +1,5 @@
 -- ============================================================================
--- MasKot | Store Ecommerce Module (02_store_ecommerce_rls.sql)
+-- MassKot | Store Ecommerce Module (02_store_ecommerce_rls.sql)
 -- Phase 3: RLS Policies & Security
 -- ============================================================================
 

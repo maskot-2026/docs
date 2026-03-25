@@ -1,5 +1,5 @@
 -- ============================================================================
--- MasKot | Complementary Module (06_complementary_rls.sql)
+-- MassKot | Complementary Module (06_complementary_rls.sql)
 -- Phase 3: RLS Policies & Security
 -- ============================================================================
 

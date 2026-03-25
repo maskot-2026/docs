@@ -1,6 +1,6 @@
 -- Content from core_rpc.sql
 -- ============================================================================
--- MasKot | Core Module (core_rpc.sql)
+-- MassKot | Core Module (core_rpc.sql)
 -- RPC Implementations
 -- ============================================================================
 
