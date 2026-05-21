@@ -7,33 +7,42 @@
 
 ## 📋 Índice de Módulos
 
-1. [Identidad y Landings](#módulo-1-identidad-y-landings)
-2. [Tienda E-commerce](#módulo-2-tienda-e-commerce)
-3. [Checkout y Suscripción](#módulo-3-checkout-y-suscripción)
-4. [Legal y Compliance](#módulo-4-legal-y-compliance-perú)
-5. [Administración Back-office](#módulo-5-administración-back-office)
-6. [Módulos Complementarios](#módulo-6-complementarios)
-7. [Directorio Profesional](#módulo-7-directorio-profesional)
+> Los números de módulo y HU están alineados con `FRONTEND_SCOPE.md`. El orden de secciones en este documento refleja dependencias técnicas, no el flujo de usuario.
+
+| # | Módulo | Sección en este documento |
+|---|--------|--------------------------|
+| 1 | Marketing & Contenido Público | [→](#módulo-1-marketing--contenido-público) |
+| 2 | Tienda y Catálogo | [→](#módulo-2-tienda-y-catálogo) |
+| 3 | Carrito de Compras | [→](#módulo-3-carrito-de-compras) |
+| 4 | Checkout y Pagos | [→](#módulo-4-checkout-y-pagos) |
+| 5 | Cuenta de Usuario | [→](#módulos-5-y-6-cuenta-de-usuario-e-historial-de-pedidos) |
+| 6 | Historial de Pedidos (Usuario) | [→](#módulos-5-y-6-cuenta-de-usuario-e-historial-de-pedidos) |
+| 7 | Suscripciones | [→](#módulo-7-suscripciones) |
+| 8 | Legal y Compliance | [→](#módulo-8-legal-y-compliance-perú) |
+| 9 | Back-office — CMS y Contenido | [→](#módulos-9-10-y-11-back-office) |
+| 10 | Back-office — Inventario | [→](#módulos-9-10-y-11-back-office) |
+| 11 | Back-office — Operaciones | [→](#módulos-9-10-y-11-back-office) |
+| 12 | Directorio de Especialistas | [→](#módulo-12-directorio-de-especialistas) |
 
 ---
 
-## Módulo 1: Identidad y Landings
+## Módulo 1: Marketing & Contenido Público
 
-### HU-1.1: Home Page con Hero Dinámico
+### HU-1.1: Landing Page (Home)
 
 **User Story:** Como visitante, quiero ver una página de inicio atractiva con información clara, para entender el valor de la nutrición personalizada.
 
 **Criterios de Aceptación:**
 
-- [ ] Hero banner dinámico con título, subtítulo y CTA "Descubre tu plan ideal"
-- [ ] Sección comparador de costos: comida tradicional vs MasKot
-- [ ] Slider interactivo para simular ahorro según peso/edad de mascota
-- [ ] Sección "Cómo funciona" en 3 pasos con iconos
-- [ ] Carrusel de testimonios con foto de mascota, nombre del dueño y rating
-- [ ] Mostrar testimonios destacados (configurables desde admin)
-- [ ] Banner CTA final con llamado a acción
-- [ ] Loading skeleton mientras cargan datos dinámicos
-- [ ] Mobile-first responsive
+- [x] Hero banner dinámico con título, subtítulo y CTA configurables desde CMS
+- [x] Sección comparador de costos / calculadora de ahorro interactiva
+- [x] Slider interactivo para simular ahorro según peso/edad de mascota
+- [x] Sección "Cómo funciona" en 3 pasos con iconos
+- [x] Carrusel de testimonios con foto de mascota, nombre del dueño y rating
+- [x] Mostrar testimonios destacados (configurables desde admin)
+- [x] Banner CTA final con llamado a acción
+- [x] Loading skeleton mientras cargan datos dinámicos
+- [x] Mobile-first responsive
 
 **NOTA:** Ultima seccion de Organizaciones Aliadas o Patrocinadores, Startup Perú 12G, Incubagraria, Santander X.
 
@@ -251,20 +260,20 @@ $$ LANGUAGE plpgsql SECURITY INVOKER;
 
 ---
 
-### HU-1.2: Página "Nosotros"
+### HU-1.2: Página Nosotros
 
 **User Story:** Como visitante, quiero conocer la filosofía y equipo de MasKot, para generar confianza antes de comprar.
 
 **Criterios de Aceptación:**
 
-- [ ] Hero banner con título y subtítulo de la página
-- [ ] Sección Misión/Visión con animaciones al scroll
-- [ ] Timeline interactivo de historia de la empresa
-- [ ] Grid de miembros del equipo con foto, nombre, rol y LinkedIn
-- [ ] Galería de certificaciones y avales veterinarios
-- [ ] Banner CTA final
-- [ ] Loading skeleton
-- [ ] Mobile-first responsive
+- [x] Hero banner con imagen, título y subtítulo de la página
+- [x] Sección Misión/Visión con valores
+- [x] Timeline interactivo de historia de la empresa
+- [x] Grid de miembros del equipo con foto, nombre y cargo
+- [x] Galería de certificaciones y avales veterinarios
+- [x] Banner CTA final
+- [x] Loading skeleton
+- [x] Mobile-first responsive
 
 **Frontend:** `src/features/about/pages/AboutPage.tsx`
 
@@ -366,10 +375,10 @@ INSERT INTO about_page_config (id, hero_section, mission_vision_section, timelin
 
 **Criterios de Aceptación:**
 
-- [ ] Sección de FAQs destacadas en el Landing Page.
-- [ ] Página independiente (`/faqs`) con todas las categorías de preguntas.
-- [ ] Listado de preguntas frecuentes agrupadas por categoría (p. ej. "Sobre la Comida", "Envíos", "Suscripción").
-- [ ] Diseño acordeón interactivo para mostrar/ocultar respuestas.
+- [x] Sección de FAQs destacadas en el Landing Page.
+- [x] Página independiente (`/faqs`) con todas las categorías de preguntas.
+- [x] Listado de preguntas frecuentes agrupadas por categoría.
+- [x] Diseño acordeón interactivo para mostrar/ocultar respuestas.
 - [ ] Búsqueda en tiempo real por palabra clave.
 
 **Frontend:** `src/features/faq/pages/FaqPage.tsx`, `LandingPage.tsx`
@@ -414,22 +423,22 @@ INSERT INTO faqs (category_id, question, answer, display_order) VALUES
 
 ---
 
-### HU-1.4: Blog Educativo con CMS
+### HU-1.4: Blog
 
 **User Story:** Como visitante, quiero acceder a contenido educativo sobre nutrición de mascotas.
 
 **Criterios de Aceptación:**
 
 - [ ] Listado de artículos con paginación (12/página)
-- [ ] Cards con imagen destacada, título, description y tiempo de lectura
-- [ ] Filtros por categoría
+- [x] Cards con imagen destacada, título, descripción y categoría
+- [x] Filtros por categoría
 - [ ] Búsqueda por título/contenido
-- [ ] Vista de artículo individual con slug SEO-friendly
+- [x] Vista de artículo individual con slug SEO-friendly y contenido Markdown
 - [ ] Tabla de contenidos (TOC) sticky en desktop
 - [ ] Autor del artículo con avatar y nombre
 - [ ] Artículos relacionados al final
 - [ ] SEO: meta_title, meta_description
-- [ ] Estados: borrador, publicado, archivado
+- [x] Estados: borrador / publicado (gestionable desde admin)
 - [ ] Share buttons (WhatsApp, Facebook, Copy link)
 
 **Frontend:** `src/features/blog/pages/BlogListPage.tsx`, `BlogPostPage.tsx`
@@ -500,7 +509,7 @@ Si notas sensibilidad, mantén un paso extra antes de avanzar.$$ , 'https://imag
 
 ---
 
-## Módulo 2: Tienda (E-commerce)
+## Módulo 2: Tienda y Catálogo
 
 ### HU-2.1: Catálogo de Productos
 
@@ -508,12 +517,14 @@ Si notas sensibilidad, mantén un paso extra antes de avanzar.$$ , 'https://imag
 
 **Criterios de Aceptación:**
 
-- [ ] Listado de productos con cards: imagen, nombre, precio, rating
-- [ ] Filtros por: categoría, rango de precio, tipo de alimento
-- [ ] Ordenar por: precio (asc/desc), popularidad
+- [x] Listado de productos con cards: imagen, nombre, precio y categoría
+- [x] Filtros por categoría
+- [x] Ordenar por: precio (asc/desc), popularidad
 - [ ] Vista grid/lista toggle
-- [] Lazy loading de imágenes
-- [ ] Skeleton loaders
+- [x] Lazy loading de imágenes
+- [x] Skeleton loaders
+- [ ] Filtro por rango de precio
+- [ ] Badge de stock bajo / agotado
 
 **Frontend:** `src/features/store/pages/CatalogPage.tsx`
 
@@ -536,7 +547,7 @@ CREATE TABLE products (
     slug TEXT NOT NULL UNIQUE,
     description TEXT,
     short_description TEXT,
-    sub_discount_pct INTEGER DEFAULT 0 CHECK (sub_discount_pct BETWEEN 0 AND 100),
+    sub_discount_pct NOT NULL INTEGER DEFAULT 0 CHECK (sub_discount_pct BETWEEN 0 AND 100),
     images TEXT[] NOT NULL DEFAULT '{}',
     category_id BIGINT REFERENCES product_categories(id) ON DELETE SET NULL,
     variants JSONB NOT NULL DEFAULT '{}'::jsonb, -- Opciones/variantes (ej. tamaño, peso, precio, stock)
@@ -544,7 +555,7 @@ CREATE TABLE products (
     published_at TIMESTAMPTZ, -- auto set when product is activated the first time
     is_active BOOLEAN NOT NULL DEFAULT FALSE,
     is_professional_product BOOLEAN NOT NULL DEFAULT FALSE,
-    professional_discount_pct INTEGER DEFAULT 0 CHECK (professional_discount_pct BETWEEN 0 AND 100),
+    professional_discount_pct NOT NULL INTEGER DEFAULT 0 CHECK (professional_discount_pct BETWEEN 0 AND 100),
     created_at TIMESTAMPTZ NOT NULL DEFAULT NOW(),
     updated_at TIMESTAMPTZ NOT NULL DEFAULT NOW()
 );
@@ -629,16 +640,16 @@ INSERT INTO product_reviews (product_id, profile_id, rating, comment) VALUES
 **Criterios de Aceptación:**
 
 - [ ] Galería de imágenes con zoom y swipe en mobile
-- [ ] Selector de peso/presentación
-- [ ] Toggle: Compra única vs Suscripción con % descuento visible
-- [ ] Selector de frecuencia de suscripción (semanal, quincenal, mensual)
-- [ ] Tabla nutricional completa
-- [ ] Listado de ingredientes ordenados por porcentaje
-- [ ] Reviews de usuarios con rating y comentario
-- [ ] Rating promedio calculado
+- [x] Selector de peso/presentación
+- [x] Toggle: Compra única vs Suscripción con % descuento visible
+- [x] Selector de frecuencia de suscripción (semanal, quincenal, mensual)
+- [x] Tabla nutricional completa
+- [x] Listado de ingredientes con porcentaje, origen y descripción
+- [x] Reviews de usuarios con rating y comentario
+- [x] Rating promedio calculado
 - [ ] Sección de productos complementarios (cross-sell)
 - [ ] Botón "Agregar al carrito" sticky en mobile
-- [ ] Breadcrumb de navegación
+- [x] Breadcrumb de navegación
 
 **Frontend:** `src/features/store/pages/ProductDetailPage.tsx`
 
@@ -714,26 +725,28 @@ INSERT INTO product_nutrition_facts (product_id, nutrient, value, unit, daily_pc
 
 ---
 
-### HU-2.3: Carrito de Compras
+## Módulo 3: Carrito de Compras
+
+### HU-3.1: Gestión del Carrito
 
 **User Story:** Como usuario, quiero gestionar mi carrito antes de pagar.
 
 **Criterios de Aceptación:**
 
-- [ ] Agregar productos al carrito (validar stock disponible)
-- [ ] Quitar productos del carrito
-- [ ] Modificar cantidades con validación de stock
-- [ ] Toggle compra única/suscripción por item
-- [ ] Mostrar subtotal, descuentos aplicados, costo de envío, total
-- [ ] Cálculo de envío por distrito
+- [x] Agregar productos al carrito (validar stock disponible)
+- [x] Quitar productos del carrito
+- [x] Modificar cantidades con validación de stock
+- [x] Toggle compra única/suscripción por item
+- [x] Mostrar subtotal, descuentos aplicados, costo de envío, IGV (desglosado) y total
+- [x] Cálculo de envío por distrito
 - [ ] Sección cross-selling: toppers, snacks, accesorios
-- [ ] Input de cupón de descuento con validación
-- [ ] Validar mínimo de orden y vigencia del cupón
-- [ ] Persistir carrito para usuarios logueados
-- [ ] Persistir en localStorage para guests
-- [ ] Botón "Proceder al checkout"
+- [x] Input de cupón de descuento con validación
+- [x] Validar mínimo de orden y vigencia del cupón (mensaje de error del RPC)
+- [x] Persistir carrito para usuarios logueados
+- [x] Persistir en localStorage para guests
+- [x] Botón "Proceder al checkout"
 
-**Frontend:** `src/features/store/pages/CartPage.tsx`
+**Frontend:** `src/features/cart/pages/CartPage.tsx`
 
 **Supabase (`02_store_ecommerce`):**
 
@@ -816,9 +829,9 @@ $$ LANGUAGE plpgsql SECURITY INVOKER;
 
 ---
 
-## Módulo 3: Checkout y Suscripción
+## Módulo 4: Checkout y Pagos
 
-### HU-3.1: Flujo de Checkout
+### HU-4.1: Flujo de Checkout
 
 **User Story:** Como usuario, quiero completar mi compra de forma segura.
 
@@ -833,8 +846,8 @@ $$ LANGUAGE plpgsql SECURITY INVOKER;
 - [x] Usuarios Guest (sin autenticar): Pueden comprar normalmente, pero **no** tienen autorrellenado y **no** pueden suscribirse a productos recurrentes.
 - [ ] Aceptación de términos y condiciones (checkbox obligatorio)
 - [ ] **[COMPLIANCE]** Texto de consentimiento explícito de tokenización para suscripciones: _"Al realizar esta compra, autorizas a MasKot a guardar tu tarjeta de forma segura en Mercado Pago para procesar los cobros automáticos de tu suscripción. Puedes cancelar en cualquier momento desde tu cuenta."_ — Requerido por Visa/Mastercard para cobros MIT (Merchant Initiated Transactions). Sin este texto, cualquier contracargo lo gana automáticamente el usuario.
-- [ ] Generar número de orden único al confirmar
-- [ ] Página de confirmación con resumen del pedido
+- [x] Generar número de orden único al confirmar
+- [x] Página de confirmación con resumen del pedido (`src/features/checkout/pages/OrderSuccessPage.tsx`)
 - [ ] Email de confirmación automático
 
 **Frontend:** `src/features/checkout/pages/CheckoutPage.tsx`
@@ -1004,7 +1017,9 @@ SELECT cron.schedule('cancel-expired-orders', '*/5 * * * *', $$SELECT cancel_exp
 
 ---
 
-### HU-3.2: Panel de Gestión de Suscripción
+## Módulo 7: Suscripciones
+
+### HU-7.1: Panel de Gestión de Suscripción
 
 **User Story:** Como suscriptor, quiero gestionar mi suscripción desde mi cuenta.
 
@@ -1132,7 +1147,9 @@ VALUES ({profile_id}, 1, 'Receta Base (Mock)', 'SKU-MOCK-01', '{"peso": "500g"}'
 
 ---
 
-### HU-3.3: Gestión de IGV y Facturación Electrónica (SUNAT / Nubefact)
+> 📌 **Nota:** La siguiente HU pertenece al **Módulo 4: Checkout y Pagos** pero se documenta en esta posición por continuidad técnica con el flujo de pago.
+
+### HU-4.3: Gestión de IGV y Facturación Electrónica (SUNAT / Nubefact)
 
 **User Story:** Como negocio, necesito cumplir con la obligación tributaria peruana emitiendo comprobantes electrónicos (boletas y facturas) validados por SUNAT para cada venta aprobada.
 
@@ -1185,22 +1202,22 @@ NUBEFACT_FACTURA_SERIES=F001
 
 ---
 
-## Módulo 4: Legal y Compliance (Perú)
+## Módulo 8: Legal y Compliance (Perú)
 
-### HU-4.1: Páginas Legales Estáticas
+### HU-8.1: Páginas Legales Estáticas
 
 **User Story:** Como usuario, quiero acceder a información legal clara.
 
 **Criterios de Aceptación:**
 
-- [ ] Página de Política de Privacidad (Ley 29733 - Perú)
-- [ ] Página de Términos y Condiciones
-- [ ] Página de Política de Devoluciones
-- [ ] Página de Política de Envíos
-- [ ] Contenido dinámico desde CMS
-- [ ] Mostrar versión y fecha de publicación del documento
+- [x] Página de Política de Privacidad (Ley 29733 - Perú)
+- [x] Página de Términos y Condiciones
+- [x] Página de Política de Devoluciones
+- [x] Página de Política de Envíos
+- [x] Contenido dinámico desde CMS
+- [x] Mostrar versión y fecha de publicación del documento
 - [ ] Navegación por secciones (TOC sticky)
-- [ ] Botón de versión imprimible / exportar PDF
+- [x] Botón de versión imprimible / exportar PDF
 - [ ] SEO: meta tags dinámicos por página
 
 **Frontend:** `src/features/legal/pages/LegalDocumentPage.tsx`
@@ -1308,25 +1325,25 @@ Si el despachador no lograra ubicar a una persona autorizada en el domicilio lue
 
 ---
 
-### HU-4.2: Libro de Reclamaciones Virtual
+### HU-8.2: Libro de Reclamaciones Virtual
 
 **User Story:** Como usuario, quiero presentar una reclamación formal según normativa peruana.
 
 **Criterios de Aceptación:**
 
-- [ ] Formulario según formato INDECOPI
-- [ ] Selector de tipo: Reclamo o Queja
-- [ ] Datos del consumidor: tipo documento, número, nombre, email, teléfono
-- [ ] Validación de DNI (8 dígitos)
-- [ ] Descripción del producto/servicio
-- [ ] Detalle de la reclamación
-- [ ] Pedido del consumidor
-- [ ] Generación automática de número de reclamo
-- [ ] Estado del reclamo (pendiente, en revisión, resuelto, cerrado)
+- [x] Formulario según formato INDECOPI
+- [x] Selector de tipo: Reclamo o Queja
+- [x] Datos del consumidor: tipo documento, número, nombre, email, teléfono
+- [x] Validación de DNI (8 dígitos), RUC (11 dígitos), CE y Pasaporte
+- [x] Descripción del producto/servicio
+- [x] Detalle de la reclamación
+- [x] Pedido del consumidor
+- [x] Generación automática de número de reclamo
+- [ ] Estado del reclamo visible para el usuario (pendiente, en revisión, resuelto, cerrado)
 - [ ] Generación de PDF con formato oficial
 - [ ] Envío de copia por email al consumidor
-- [ ] Plazo de respuesta visible (30 días calendario)
-- [ ] Página de consulta de estado del reclamo
+- [x] Plazo de respuesta visible (normativa)
+- [ ] Página de consulta de estado del reclamo por número de ticket
 
 **Frontend:** `src/features/legal/pages/ClaimsBookPage.tsx`
 
@@ -1377,9 +1394,14 @@ CREATE TABLE claims (
 
 ---
 
-## Módulo 5: Administración (Back-office)
+## Módulos 9, 10 y 11: Back-office
 
-### HU-5.1: Reportes y métricas
+> Las HUs de este bloque se distribuyen en tres módulos según `FRONTEND_SCOPE.md`:  
+> **Módulo 9** — CMS y Contenido: HU-9.1 (Dashboard), HU-9.2–9.6 (CMS)  
+> **Módulo 10** — Inventario: HU-10.1  
+> **Módulo 11** — Operaciones: HU-11.1 (Pedidos), HU-11.2 (Usuarios), HU-11.3 (Cupones), HU-11.4 (Reportes), HU-11.5 (Reclamos), HU-11.6 (Validación Profesionales)
+
+### HU-11.4: Reportes y Métricas
 
 **User Story:** Como administrador, quiero revisar reportes de ventas y suscripciones para tomar decisiones rápidas.
 
@@ -1416,7 +1438,7 @@ $$ LANGUAGE plpgsql SECURITY DEFINER;
 
 ---
 
-### HU-5.2: Gestión de Pedidos
+### HU-11.1: Gestión de Pedidos
 
 **User Story:** Como administrador, quiero gestionar el ciclo de vida de pedidos.
 
@@ -1428,6 +1450,7 @@ $$ LANGUAGE plpgsql SECURITY DEFINER;
 - [x] Marcar como enviado/entregado.
 - [x] Procesar devolución con cambio de estado.
 - [x] Búsqueda rápida por número de orden.
+- [x] Exportar listado de órdenes a Excel.
 
 **Frontend:** `src/features/admin/orders/pages/AdminOrdersPage.tsx`
 
@@ -1440,7 +1463,7 @@ $$ LANGUAGE plpgsql SECURITY DEFINER;
 
 ---
 
-### HU-5.3: Gestión de Inventario
+### HU-10.1: Gestión de Inventario
 
 **User Story:** Como administrador, quiero controlar el stock de productos.
 
@@ -1469,7 +1492,7 @@ $$ LANGUAGE plpgsql SECURITY DEFINER;
 
 ---
 
-### HU-5.4: Gestión del Directorio Profesional (B2B)
+### HU-11.6: Validación de Profesionales (B2B)
 
 **User Story:** Como administrador, quiero validar y gestionar las cuentas de los profesionales antes de que aparezcan en el directorio público y accedan a descuentos.
 
@@ -1509,7 +1532,7 @@ CREATE OR REPLACE FUNCTION toggle_professional_account_status(
 
 ---
 
-### HU-5.5: Usuarios y roles
+### HU-11.2: Usuarios y Roles
 
 **User Story:** Como administrador, quiero gestionar accesos y roles de usuarios.
 
@@ -1532,7 +1555,7 @@ CREATE OR REPLACE FUNCTION toggle_professional_account_status(
 
 ---
 
-### HU-5.6: Gestión de cupones y promociones
+### HU-11.3: Gestión de Cupones y Promociones
 
 **User Story:** Como administrador, quiero crear y controlar cupones de descuento.
 
@@ -1553,9 +1576,9 @@ CREATE OR REPLACE FUNCTION toggle_professional_account_status(
 
 ---
 
-### HU-5.7: CMS de contenido y legal
+### HU-9.2–9.6: CMS de Contenido y Legal
 
-**User Story:** Como administrador, quiero editar el contenido publico sin depender de desarrollo.
+**User Story:** Como administrador, quiero editar el contenido público sin depender de desarrollo.
 
 **Criterios de Aceptación:**
 
@@ -1585,15 +1608,15 @@ CREATE OR REPLACE FUNCTION toggle_professional_account_status(
 
 ---
 
-### HU-5.8: Gestión de reclamos (Admin)
+### HU-11.5: Gestión de Reclamos (Admin)
 
 **User Story:** Como administrador, quiero gestionar reclamos del Libro de Reclamaciones.
 
 **Criterios de Aceptación:**
 
-- [ ] Listado de reclamos con filtros por estado.
-- [ ] Ver detalle completo del reclamo.
-- [ ] Registrar respuesta y cambio de estado.
+- [x] Listado de reclamos con filtros por estado y búsqueda por ticket/cliente.
+- [x] Ver detalle completo del reclamo.
+- [x] Registrar respuesta y cambio de estado.
 - [ ] Exportar reporte de reclamos.
 
 **Frontend:** `src/features/admin/claims/pages/AdminClaimsPage.tsx`
@@ -1606,7 +1629,7 @@ CREATE OR REPLACE FUNCTION toggle_professional_account_status(
 
 ---
 
-### HU-5.9: Panel administrativo
+### HU-9.1: Dashboard Administrativo
 
 **User Story:** Como administrador, quiero un panel de inicio con accesos directos.
 
@@ -1620,32 +1643,36 @@ CREATE OR REPLACE FUNCTION toggle_professional_account_status(
 
 ---
 
-## Módulo 6: Complementarios
+## Módulos 5 y 6: Cuenta de Usuario e Historial de Pedidos
 
-### HU-6.1: Autenticación y Perfiles
+> Este bloque cubre las HUs de los módulos 5 y 6 de `FRONTEND_SCOPE.md`:  
+> **Módulo 5** — Cuenta de Usuario: HU-5.1 (Auth), HU-5.2 (Perfil), HU-5.3 (Direcciones), HU-5.4 (Facturación)  
+> **Módulo 6** — Historial de Pedidos: HU-6.1 (Listado de Órdenes), HU-6.2 (Detalle de Orden)
+
+### HU-5.1–6.2: Cuenta de Usuario (Autenticación, Perfil, Direcciones, Facturación e Historial de Pedidos)
 
 **User Story:** Como usuario, quiero crear cuenta y gestionar mi perfil.
 
 **Criterios de Aceptación:**
 
-- [ ] Registro con email/contraseña (Supabase Auth)
-- [ ] Login con email/contraseña
-- [ ] Login social con Google OAuth
-- [ ] Flujo de recuperación de contraseña por email
-- [ ] Verificación de email obligatoria
-- [ ] Crear perfil automáticamente al registrarse
-- [ ] Asignar rol 'user' por defecto
-- [ ] username obligatorio en registro por email (solo `[a-z0-9_]`, 3-30 chars)
-- [ ] username auto-generado (`user_` + hex) en registro con Google OAuth
-- [ ] full_name y username NOT NULL en tabla profiles
-- [ ] username UNIQUE — no puede repetirse entre usuarios
-- [ ] Página de perfil con datos personales editables
-- [ ] Editar username con validación (lowercase, sin espacios, UNIQUE)
-- [ ] Editar full_name (obligatorio)
-- [ ] Subir foto de perfil (avatar)
-- [ ] Agregar tipo y número de documento
-- [ ] Gestionar múltiples direcciones de envío
-- [ ] Ver historial de pedidos
+- [x] Registro con email/contraseña (Supabase Auth)
+- [x] Login con email/contraseña
+- [x] Login social con Google OAuth
+- [x] Flujo de recuperación de contraseña por email
+- [x] Verificación de email obligatoria
+- [x] Crear perfil automáticamente al registrarse
+- [x] Asignar rol 'user' por defecto
+- [x] username obligatorio en registro por email (solo `[a-z0-9_]`, 3-30 chars)
+- [x] username auto-generado (`user_` + hex) en registro con Google OAuth
+- [x] full_name y username NOT NULL en tabla profiles
+- [x] username UNIQUE — no puede repetirse entre usuarios
+- [x] Página de perfil con datos personales editables
+- [x] Editar username con validación (lowercase, sin espacios, UNIQUE)
+- [x] Editar full_name (obligatorio)
+- [x] Subir foto de perfil (avatar)
+- [x] Agregar tipo y número de documento (vía BillingManager)
+- [x] Gestionar múltiples direcciones de envío
+- [x] Ver historial de pedidos
 
 **Frontend:** `src/features/security/`, `src/features/profile/`
 
@@ -1710,9 +1737,9 @@ $$ LANGUAGE plpgsql SECURITY DEFINER;
 
 ---
 
-## Módulo 7: Directorio Profesional
+## Módulo 12: Directorio de Especialistas
 
-### HU-7.1: Landing Page del Directorio Profesional
+### HU-12.1: Landing Page del Directorio de Especialistas
 
 **User Story:** Como visitante o dueño de mascota, quiero ver una página de inicio (Landing Page) atractiva del directorio con herramientas de búsqueda rápida, categorías y propuesta de valor para entender cómo encontrar y agendar con el profesional adecuado, además de una invitación para que nuevos profesionales se unan.
 
@@ -1811,7 +1838,7 @@ INSERT INTO professional_page_config (
 
 ---
 
-### HU-7.2: Perfil Público y Registro del Profesional
+### HU-12.2: Perfil Público y Registro del Profesional
 
 **User Story:** Como profesional de mascotas, quiero registrarme, acreditar mi identidad y crear un perfil detallado de mi práctica en un solo lugar para que los dueños me encuentren y pueda acceder a los descuentos exclusivos.
 
@@ -1930,7 +1957,7 @@ RETURNS JSONB AS $$ $$ LANGUAGE plpgsql SECURITY DEFINER;
 
 ---
 
-### HU-7.3: Búsqueda y Directorio Interactivo (Mapa)
+### HU-12.3: Búsqueda y Directorio Interactivo (Mapa)
 
 **User Story:** Como dueño de mascota, quiero buscar profesionales cercanos e idóneos para agendar la atención que necesita mi mascota.
 
@@ -1959,7 +1986,7 @@ RETURNS JSONB AS $$ $$ LANGUAGE plpgsql SECURITY DEFINER;
 
 ---
 
-### HU-7.4: Herramienta de Agendamiento de Citas
+### HU-12.4: Herramienta de Agendamiento de Citas
 
 **User Story:** Como usuario, quiero ver la información completa de un profesional y reservar una franja horaria para atender a mi mascota.
 
@@ -2020,7 +2047,7 @@ CREATE TABLE professional_reviews (
 
 ---
 
-### HU-7.5: Beneficios Tienda para Profesionales (Descuentos)
+### HU-12.5: Beneficios Tienda para Profesionales (Descuentos)
 
 **User Story:** Como profesional habilitado en el Directorio, quiero acceder automáticamente a precios mayoristas al comprar en la tienda MasKot.
 
@@ -2081,29 +2108,29 @@ supabase/
 
 ### Must Have (MVP)
 
-- HU-1.1: Home Page
-- HU-2.1, 2.2, 2.3: Catálogo y Carrito
-- **HU-2.4: Calculadora de Ración** ⭐
-- HU-3.1: Checkout simplificado
-- HU-4.1, 4.2: Legal + Libro Reclamaciones
-- HU-6.1: Autenticación
-- **HU-7.2, 7.3: Registro y Catálogo B2B** ⭐
+- HU-1.1: Landing Page
+- HU-2.1, 2.2: Tienda y Catálogo
+- HU-3.1: Carrito de Compras
+- HU-4.1: Checkout simplificado
+- HU-5.1–6.2: Cuenta de Usuario e Historial de Pedidos
+- HU-8.1, 8.2: Legal + Libro de Reclamaciones
+- **HU-12.2, 12.3: Registro y Búsqueda B2B** ⭐
 
 ### Should Have
 
-- HU-3.2: Gestión de Suscripción
-- HU-5.1, 5.2, 5.3: Admin básico
-- **HU-5.4: Gestión Cuentas B2B** ⭐
-- HU-6.2: Notificaciones
+- HU-7.1: Gestión de Suscripciones
+- HU-11.1, 11.4, 10.1: Admin básico (Pedidos, Reportes, Inventario)
+- **HU-11.6: Validación Cuentas B2B** ⭐
+- HU-6.1, 6.2: Historial de Pedidos (Usuario)
 
 ### Could Have
 
 - HU-1.2, 1.3: Nosotros y Blog
-- **HU-7.1: Landing Page del Directorio Profesional** ⭐
-- **HU-7.4: Formatos Industriales** ⭐
+- **HU-12.1: Landing Page del Directorio de Especialistas** ⭐
+- **HU-12.4: Agendamiento de Citas** ⭐
 
 ---
 
 *MasKot - MVP Simplificado - Modelo AltuDog*  
 *Fase 1: Definición & Arquitectura*  
-*Última actualización: 2026-02-16*
+*Última actualización: 2026-03-29*

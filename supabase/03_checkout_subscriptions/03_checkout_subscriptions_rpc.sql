@@ -397,7 +397,7 @@ BEGIN
 
     RETURN NEW;
 END;
-$$ LANGUAGE plpgsql SECURITY DEFINER;
+$$ LANGUAGE plpgsql SECURITY DEFINER SET search_path = public SET row_security = off;
 
 -- Adjuntar el trigger a la tabla subscriptions
 DROP TRIGGER IF EXISTS trg_log_subscription_history ON subscriptions;

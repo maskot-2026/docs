@@ -14,11 +14,17 @@ DECLARE
 BEGIN
     -- Resolver username:
     --   • Registro por email → viene en raw_user_meta_data->>'username'
-    --   • OAuth (Google)     → se auto-genera como user_ + 8 chars random hex
+    --   • OAuth (Google)     → se extrae el prefijo del email (ej: j.huanca4141@gmail.com → j.huanca4141)
+    --   • Conflicto          → se agrega sufijo aleatorio de 4 chars (ej: j.huanca4141_a3f7)
     v_username := COALESCE(
         NULLIF(TRIM(NEW.raw_user_meta_data->>'username'), ''),
-        'user_' || encode(gen_random_bytes(4), 'hex')
+        split_part(NEW.email, '@', 1)
     );
+
+    -- Si el username ya existe, agregar sufijo para evitar conflicto de unicidad
+    IF EXISTS (SELECT 1 FROM profiles WHERE username = v_username) THEN
+        v_username := v_username || '_' || substring(replace(gen_random_uuid()::text, '-', ''), 1, 4);
+    END IF;
 
     -- Resolver full_name (siempre disponible en ambos flujos)
     v_full_name := COALESCE(
@@ -41,7 +47,7 @@ BEGIN
     
     RETURN NEW;
 END;
-$$ LANGUAGE plpgsql SECURITY DEFINER SET search_path = public;
+$$ LANGUAGE plpgsql SECURITY DEFINER SET search_path = public SET row_security = off;
 
 CREATE TRIGGER on_auth_user_created
 AFTER INSERT ON auth.users
