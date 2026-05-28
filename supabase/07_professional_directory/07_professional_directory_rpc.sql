@@ -8,6 +8,10 @@
 -- ============================================================================
 
 -- RPC: Crear solicitud de cuenta profesional
+-- Nota: Si en algún deploy previo se creó la misma función con distinto ORDEN de parámetros,
+-- PostgREST puede fallar con PGRST203 (ambigüedad entre overloads). Dropeamos ambas firmas.
+DROP FUNCTION IF EXISTS create_professional_account_request(BIGINT, TEXT, TEXT, TEXT, TEXT, TEXT, TEXT, INTEGER, NUMERIC, NUMERIC);
+DROP FUNCTION IF EXISTS create_professional_account_request(BIGINT, TEXT, TEXT, TEXT, TEXT, TEXT, INTEGER, TEXT, NUMERIC, NUMERIC);
 CREATE OR REPLACE FUNCTION create_professional_account_request(
     p_profile_id BIGINT,
     p_business_name TEXT,
@@ -104,7 +108,11 @@ $$ LANGUAGE plpgsql SECURITY DEFINER;
 -- HU-7.2: Catálogo Profesional
 -- ============================================================================
 
--- RPC: Listar profesionales publicados con filtros
+-- RPC: Listar profesionales publicados con filtros (actualizado con slug, is_available, phone)
+-- Nota: Postgres no permite cambiar el RETURNS TABLE con CREATE OR REPLACE.
+-- Por eso dropeamos primero la función existente (misma firma de parámetros).
+DROP FUNCTION IF EXISTS get_published_professionals(INTEGER, TEXT, TEXT, TEXT, TEXT);
+DROP FUNCTION IF EXISTS get_published_professionals(BIGINT, TEXT, TEXT, TEXT, TEXT);
 CREATE OR REPLACE FUNCTION get_published_professionals(
     p_specialty_id INTEGER DEFAULT NULL,
     p_consultation_type TEXT DEFAULT NULL,
@@ -114,6 +122,7 @@ CREATE OR REPLACE FUNCTION get_published_professionals(
 )
 RETURNS TABLE (
     id BIGINT,
+    slug TEXT,
     public_name TEXT,
     title TEXT,
     profile_photo_url TEXT,
@@ -125,12 +134,15 @@ RETURNS TABLE (
     average_rating NUMERIC,
     total_reviews INTEGER,
     specialty_name TEXT,
-    specialty_slug TEXT
+    specialty_slug TEXT,
+    is_available BOOLEAN,
+    phone TEXT
 ) AS $$
 BEGIN
     RETURN QUERY
     SELECT
         p.id,
+        p.slug,
         p.public_name,
         p.title,
         p.profile_photo_url,
@@ -142,7 +154,9 @@ BEGIN
         COALESCE(p.average_rating, 0),
         COALESCE(p.total_reviews, 0),
         sp.name,
-        sp.slug
+        sp.slug,
+        COALESCE(p.is_available, true),
+        p.phone
     FROM professional_profiles p
     JOIN professional_services ps
         ON ps.professional_profile_id = p.id

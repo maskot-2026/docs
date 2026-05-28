@@ -55,17 +55,37 @@ END;
 $$ LANGUAGE plpgsql SECURITY DEFINER;
 
 -- ============================================================================
--- RPC: Update professional profile basic info
+-- RPC: Update professional profile basic info (con nuevos campos: is_available, phone, slug)
 -- ============================================================================
+DROP FUNCTION IF EXISTS update_professional_profile(
+    BIGINT,
+    TEXT,
+    TEXT,
+    TEXT,
+    NUMERIC,
+    TEXT[],
+    TEXT,
+    TEXT,
+    TEXT[],
+    BOOLEAN,
+    TEXT,
+    TEXT
+);
+
 CREATE OR REPLACE FUNCTION update_professional_profile(
     p_profile_id BIGINT,
     p_public_name TEXT DEFAULT NULL,
     p_title TEXT DEFAULT NULL,
     p_experience_summary TEXT DEFAULT NULL,
+    p_treated_conditions TEXT[] DEFAULT NULL,
     p_base_price NUMERIC DEFAULT NULL,
     p_consultation_types TEXT[] DEFAULT NULL,
     p_address_text TEXT DEFAULT NULL,
-    p_profile_photo_url TEXT DEFAULT NULL
+    p_profile_photo_url TEXT DEFAULT NULL,
+    p_gallery_urls TEXT[] DEFAULT NULL,
+    p_is_available BOOLEAN DEFAULT NULL,
+    p_phone TEXT DEFAULT NULL,
+    p_slug TEXT DEFAULT NULL
 ) RETURNS JSONB AS $$
 DECLARE
     v_profile_id BIGINT;
@@ -80,6 +100,13 @@ BEGIN
         RETURN jsonb_build_object('success', false, 'error', 'Perfil no encontrado');
     END IF;
 
+    -- Verificar que el slug no esté en uso por otro perfil
+    IF p_slug IS NOT NULL AND p_slug != '' THEN
+        IF EXISTS (SELECT 1 FROM professional_profiles WHERE slug = p_slug AND profile_id != p_profile_id) THEN
+            RETURN jsonb_build_object('success', false, 'error', 'Este slug ya está en uso por otro profesional');
+        END IF;
+    END IF;
+
     -- Actualizar solo los campos proporcionados
     UPDATE professional_profiles SET
         public_name = COALESCE(p_public_name, public_name),
@@ -89,6 +116,10 @@ BEGIN
         consultation_types = COALESCE(p_consultation_types, consultation_types),
         address_text = COALESCE(p_address_text, address_text),
         profile_photo_url = COALESCE(p_profile_photo_url, profile_photo_url),
+        gallery_urls = COALESCE(p_gallery_urls, gallery_urls),
+        is_available = COALESCE(p_is_available, is_available),
+        phone = COALESCE(p_phone, phone),
+        slug = COALESCE(p_slug, slug),
         updated_at = NOW()
     WHERE profile_id = p_profile_id;
 
