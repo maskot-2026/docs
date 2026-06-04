@@ -167,3 +167,160 @@ BEGIN
     );
 END;
 $$ LANGUAGE plpgsql STABLE SECURITY DEFINER;
+
+
+-- ============================================================================
+-- +Kot | RPC: Calculadora Nutricional con Fórmula RER Veterinaria
+-- Versión 2 — tabla de racionamiento oficial + lógica de tomas
+-- Reemplaza el uso en front de calculate_cost_savings (mantenido arriba por historial)
+-- ============================================================================
+
+CREATE OR REPLACE FUNCTION calculate_pet_nutrition(
+    p_pet_weight_kg   NUMERIC,
+    p_pet_type        TEXT    DEFAULT 'dog',        -- 'dog' | 'cat'
+    p_life_stage      TEXT    DEFAULT 'adult',      -- 'adult' | 'puppy' | 'senior'
+    p_is_neutered     BOOLEAN DEFAULT FALSE,
+    p_activity_level  TEXT    DEFAULT 'normal',     -- 'sedentary' | 'normal' | 'active' | 'very_active'
+    p_body_condition  TEXT    DEFAULT 'ideal'       -- 'underweight' | 'ideal' | 'overweight'
+) RETURNS JSONB AS $$
+DECLARE
+    v_rer             NUMERIC;
+    v_mer_factor      NUMERIC;
+    v_mer             NUMERIC;
+
+    v_grams_per_kg    NUMERIC;
+    v_daily_grams     NUMERIC;
+
+    v_num_tomas       INTEGER;
+    v_grams_per_toma  NUMERIC;
+
+    v_kcal_per_g      NUMERIC;
+
+    v_price_per_kg    NUMERIC := 12.95;
+
+    v_kg_monthly      NUMERIC;
+    v_cost_monthly    NUMERIC;
+
+    v_stage_name      TEXT;
+BEGIN
+
+    -- 1. RER (NRC 2006)
+    IF p_pet_type = 'cat' THEN
+        v_rer := 70 * POWER(p_pet_weight_kg, 0.67);
+    ELSE
+        v_rer := 70 * POWER(p_pet_weight_kg, 0.75);
+    END IF;
+
+    -- 2. Factor MER base
+    IF p_pet_type = 'cat' THEN
+        CASE p_life_stage
+            WHEN 'puppy'  THEN v_mer_factor := 2.2; v_stage_name := 'Gatito';
+            WHEN 'senior' THEN v_mer_factor := 1.1; v_stage_name := 'Gato senior';
+            ELSE               v_mer_factor := 1.4; v_stage_name := 'Gato adulto';
+        END CASE;
+    ELSE
+        CASE p_life_stage
+            WHEN 'puppy'  THEN v_mer_factor := 2.5; v_stage_name := 'Cachorro';
+            WHEN 'senior' THEN v_mer_factor := 1.2; v_stage_name := 'Senior';
+            ELSE               v_mer_factor := 1.6; v_stage_name := 'Adulto';
+        END CASE;
+    END IF;
+
+    -- 3. Ajustes MER
+    IF p_is_neutered THEN
+        v_mer_factor := v_mer_factor * 0.80;
+    END IF;
+
+    CASE p_activity_level
+        WHEN 'sedentary'   THEN v_mer_factor := v_mer_factor * 0.85;
+        WHEN 'active'      THEN v_mer_factor := v_mer_factor * 1.25;
+        WHEN 'very_active' THEN v_mer_factor := v_mer_factor * 1.50;
+        ELSE NULL;
+    END CASE;
+
+    CASE p_body_condition
+        WHEN 'underweight' THEN v_mer_factor := v_mer_factor * 1.20;
+        WHEN 'overweight'  THEN v_mer_factor := v_mer_factor * 0.80;
+        ELSE NULL;
+    END CASE;
+
+    -- 4. MER final
+    v_mer := v_rer * v_mer_factor;
+
+    -- 5. Gramos diarios (tabla oficial +Kot)
+    IF p_pet_type = 'dog' THEN
+        CASE p_life_stage
+            WHEN 'puppy' THEN
+                v_grams_per_kg := CASE
+                    WHEN p_pet_weight_kg <= 4  THEN 25
+                    WHEN p_pet_weight_kg <= 10 THEN 20
+                    WHEN p_pet_weight_kg <= 15 THEN 20
+                    WHEN p_pet_weight_kg <= 25 THEN 15
+                    WHEN p_pet_weight_kg <= 35 THEN 15
+                    ELSE 10
+                END;
+            WHEN 'senior' THEN
+                v_grams_per_kg := CASE
+                    WHEN p_pet_weight_kg <= 4  THEN 12
+                    WHEN p_pet_weight_kg <= 10 THEN 12
+                    ELSE 10
+                END;
+            ELSE
+                v_grams_per_kg := CASE
+                    WHEN p_pet_weight_kg <= 4  THEN 15
+                    WHEN p_pet_weight_kg <= 10 THEN 15
+                    WHEN p_pet_weight_kg <= 15 THEN 12
+                    WHEN p_pet_weight_kg <= 25 THEN 12
+                    ELSE 10
+                END;
+        END CASE;
+        v_daily_grams := ROUND(v_grams_per_kg * p_pet_weight_kg);
+
+    ELSIF p_pet_type = 'cat' THEN
+        IF p_pet_weight_kg <= 4 THEN
+            v_daily_grams := ROUND(12 * p_pet_weight_kg);
+        ELSIF p_pet_weight_kg <= 10 THEN
+            v_daily_grams := ROUND(10 * p_pet_weight_kg);
+        ELSE
+            v_kcal_per_g  := 4.2;
+            v_daily_grams := ROUND(v_mer / v_kcal_per_g);
+        END IF;
+    END IF;
+
+    v_daily_grams := GREATEST(v_daily_grams, 30);
+
+    -- 6. Tomas del día
+    v_num_tomas      := CASE WHEN p_life_stage = 'puppy' THEN 3 ELSE 2 END;
+    v_grams_per_toma := ROUND(v_daily_grams::NUMERIC / v_num_tomas);
+
+    -- 7. Costos (precio base S/ 12.95/kg)
+    v_kg_monthly   := ROUND((v_daily_grams * 30.0 / 1000), 3);
+    v_cost_monthly := ROUND(v_kg_monthly * v_price_per_kg, 2);
+
+    -- 8. Respuesta JSON
+    RETURN jsonb_build_object(
+        'pet_type',           p_pet_type,
+        'life_stage',         v_stage_name,
+        'rer_kcal',           ROUND(v_rer, 0),
+        'mer_kcal',           ROUND(v_mer, 0),
+        'mer_factor',         ROUND(v_mer_factor, 2),
+        'daily_grams',        v_daily_grams,
+        'grams_per_kg',       v_grams_per_kg,
+        'num_tomas',          v_num_tomas,
+        'grams_per_toma',     v_grams_per_toma,
+        'toma_schedule',      CASE
+                                WHEN v_num_tomas = 3 THEN ARRAY['Mañana','Mediodía','Tarde']
+                                ELSE ARRAY['Mañana','Tarde']
+                              END,
+        'kg_per_month',       v_kg_monthly,
+        'cost_per_month_eur', v_cost_monthly,
+        'price_per_kg_eur',   v_price_per_kg,
+        'inputs', jsonb_build_object(
+            'weight_kg',      p_pet_weight_kg,
+            'is_neutered',    p_is_neutered,
+            'activity_level', p_activity_level,
+            'body_condition', p_body_condition
+        )
+    );
+END;
+$$ LANGUAGE plpgsql STABLE SECURITY DEFINER;

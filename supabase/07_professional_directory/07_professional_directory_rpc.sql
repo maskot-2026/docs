@@ -15,7 +15,10 @@ CREATE OR REPLACE FUNCTION create_professional_account_request(
     p_public_name TEXT,
     p_title TEXT,
     p_document_url TEXT,
-    p_specialty_id INTEGER
+    p_specialty_id INTEGER,
+    p_address_text TEXT,
+    p_latitude NUMERIC DEFAULT NULL,
+    p_longitude NUMERIC DEFAULT NULL
 ) RETURNS JSONB AS $$
 DECLARE
     v_account_id BIGINT;
@@ -32,9 +35,17 @@ BEGIN
             'detail', 'RUC inválido: debe tener 11 dígitos numéricos'
         );
     END IF;
+
+    -- Validar que se proporcionó una dirección
+    IF p_address_text IS NULL OR TRIM(p_address_text) = '' THEN
+        RETURN jsonb_build_object(
+            'success', false,
+            'detail', 'La dirección profesional es requerida'
+        );
+    END IF;
     
-    -- Verificar si ya existe un perfil para este usuario
-    IF EXISTS (SELECT 1 FROM professional_profiles WHERE id = p_profile_id) THEN
+    -- Verificar si ya existe un perfil profesional para este usuario (por profile_id)
+    IF EXISTS (SELECT 1 FROM professional_profiles WHERE profile_id = p_profile_id) THEN
         RAISE EXCEPTION 'Ya existe una solicitud de perfil profesional para este usuario';
     END IF;
     
@@ -45,12 +56,15 @@ BEGIN
     
     -- Crear registro de perfil profesional
     INSERT INTO professional_profiles (
-        id,
+        profile_id,
         business_name,
         ruc,
         public_name,
         title,
         legal_document_url,
+        address_text,
+        latitude,
+        longitude,
         status
     ) VALUES (
         p_profile_id,
@@ -59,6 +73,9 @@ BEGIN
         p_public_name,
         p_title,
         p_document_url,
+        TRIM(p_address_text),
+        p_latitude,
+        p_longitude,
         'pending'
     ) RETURNING id INTO v_account_id;
     
@@ -85,6 +102,7 @@ BEGIN
     -- (Implementar con Supabase Edge Functions o trigger)
     
     RETURN jsonb_build_object(
+        'success', true,
         'account_id', v_account_id,
         'status', 'pending'
     );
@@ -156,10 +174,10 @@ BEGIN
         RAISE EXCEPTION 'No autorizado para verificar elegibilidad de este perfil';
     END IF;
 
-    -- Buscar cuenta del usuario
+    -- Buscar cuenta del usuario por profile_id (FK hacia profiles)
     SELECT * INTO v_account 
     FROM professional_profiles 
-    WHERE id = p_profile_id;
+    WHERE profile_id = p_profile_id;
     
     IF v_account IS NULL THEN
         RETURN jsonb_build_object(

@@ -681,7 +681,7 @@ CREATE TABLE product_nutrition_facts (
     nutrient TEXT NOT NULL,
     value NUMERIC(10, 2) NOT NULL,
     unit TEXT NOT NULL,
-    daily_pct NUMERIC(5, 2) CHECK (daily_pct >= 0)
+    daily_pct NUMERIC(5, 2) CHECK (daily_pct IS NULL OR (daily_pct >= 0 AND daily_pct <= 100))
 );
 
 -- Semilla de Ingredientes
