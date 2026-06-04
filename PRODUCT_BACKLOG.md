@@ -1475,36 +1475,35 @@ $$ LANGUAGE plpgsql SECURITY DEFINER;
 
 **Criterios de Aceptación:**
 
-- [ ] Listado de perfiles profesionales pendientes de aprobación.
-- [ ] Ver datos de validación: RUC, colegiatura, sustentos.
-- [ ] Aprobar/Rechazar perfil para publicarlo en el directorio y otorgar beneficios B2B.
-- [ ] Suspender/Reactivar perfil en caso de mala praxis o inactividad.
+- [x] Listado de perfiles profesionales pendientes de aprobación.
+- [x] Ver datos de validación: RUC, colegiatura, sustentos.
+- [x] Aprobar/Rechazar perfil para publicarlo en el directorio y otorgar beneficios B2B.
+- [x] Suspender/Reactivar perfil en caso de mala praxis o inactividad.
 
 **Frontend:** `src/features/admin/professionals/pages/AdminProfessionalsPage.tsx`
 
-**Supabase (`05_admin_backoffice`):**
+**Supabase (`07_professional_directory`):**
 
 ```sql
--- La estructura de professional_profiles ahora se define íntegramente en el Módulo 7 (HU-7.1)
--- Aquí solo se listan para visibilidad los RPCs administrativos para cambiar los estados, 
--- los cuales están implementados en 07_professional_directory_rpc.sql:
-
+-- RPC: Aprobar cuenta Profesional
 CREATE OR REPLACE FUNCTION approve_professional_account(
-    p_profile_id BIGINT,
-    p_admin_id UUID
-) RETURNS JSONB AS $$ $$ LANGUAGE plpgsql SECURITY DEFINER;
+    p_account_id BIGINT,
+    p_admin_profile_id BIGINT
+) RETURNS JSONB AS $$ ... $$ LANGUAGE plpgsql SECURITY DEFINER;
 
+-- RPC: Rechazar cuenta Profesional
 CREATE OR REPLACE FUNCTION reject_professional_account(
-    p_profile_id BIGINT,
-    p_admin_id UUID,
+    p_account_id BIGINT,
+    p_admin_profile_id BIGINT,
     p_reason TEXT
-) RETURNS JSONB AS $$ $$ LANGUAGE plpgsql SECURITY DEFINER;
+) RETURNS JSONB AS $$ ... $$ LANGUAGE plpgsql SECURITY DEFINER;
 
+-- RPC: Suspender/Reactivar cuenta Profesional
 CREATE OR REPLACE FUNCTION toggle_professional_account_status(
-    p_profile_id BIGINT,
-    p_admin_id UUID,
-    p_status TEXT
-) RETURNS JSONB AS $$ $$ LANGUAGE plpgsql SECURITY DEFINER;
+    p_account_id BIGINT,
+    p_admin_profile_id BIGINT,
+    p_suspend BOOLEAN
+) RETURNS JSONB AS $$ ... $$ LANGUAGE plpgsql SECURITY DEFINER;
 ```
 
 ---
@@ -1710,7 +1709,7 @@ $$ LANGUAGE plpgsql SECURITY DEFINER;
 
 ---
 
-## Módulo 7: Directorio Profesional
+## Módulo 12: Directorio de Especialistas
 
 ### HU-7.1: Landing Page del Directorio Profesional
 
@@ -1718,14 +1717,14 @@ $$ LANGUAGE plpgsql SECURITY DEFINER;
 
 **Criterios de Aceptación:**
 
-- [ ] Hero banner dinámico con buscador principal integrado (Especialidad y Lugar) y botón "Buscar".
-- [ ] Renderizado de imágenes/tarjetas superpuestas de profesionales destacados en el hero.
-- [ ] Sección de categorías de ayuda (ej. Veterinaria general, Nutrición, Grooming, etc.) dinámicas.
-- [ ] Sección de propuesta de valor "¿Cómo cuidamos la calidad de los profesionales?" con puntos clave ilustrados.
-- [ ] Sección CTA inferior "¿Eres profesional y quieres aparecer en +Kot?" para invitar a nuevos registros.
-- [ ] Toda la información de la landing (títulos, textos, imágenes, categorías mostradas) debe ser configurable mediante secciones JSONB.
-- [ ] Loading skeleton mientras cargan los datos dinámicos.
-- [ ] Mobile-first responsive acorde al diseño provisto.
+- [x] Hero banner dinámico con buscador principal integrado (Especialidad y Lugar) y botón "Buscar".
+- [x] Renderizado de imágenes/tarjetas superpuestas de profesionales destacados en el hero.
+- [x] Sección de categorías de ayuda (ej. Veterinaria general, Nutrición, Grooming, etc.) dinámicas.
+- [x] Sección de propuesta de valor "¿Cómo cuidamos la calidad de los profesionales?" con puntos clave ilustrados.
+- [x] Sección CTA inferior "¿Eres profesional y quieres aparecer en +Kot?" para invitar a nuevos registros.
+- [x] Toda la información de la landing (títulos, textos, imágenes, categorías mostradas) debe ser configurable mediante secciones JSONB.
+- [x] Loading skeleton mientras cargan los datos dinámicos.
+- [x] Mobile-first responsive acorde al diseño provisto.
 
 **Frontend:** `src/features/directory/pages/DirectoryLandingPage.tsx`, `directoryLandingService.ts`
 
@@ -1817,46 +1816,50 @@ INSERT INTO professional_page_config (
 
 **Criterios de Aceptación:**
 
-- [ ] Formulario unificado de registro: Datos legales (RUC, Empresa) + Datos del Perfil (Título profesional, y selección de primera Especialidad/Servicio).
-- [ ] Estado de validación por parte de MasKot (Pendiente, Aprobado, Rechazado).
-- [ ] Una vez "Aprobado", el perfil puede publicarse (`is_published = true`) y el profesional obtiene automáticamente los precios especiales en la tienda.
-- [ ] Panel de gestión: Configuración de Nombre público, Título (Ej: Médico Veterinario), y gestión de su Catálogo de Servicios (asignando a qué Especialidad del sistema pertenece cada servicio).
-- [ ] Experiencia y Resumen (Texto descriptivo + lista de condiciones tratadas).
-- [ ] Lista de Servicios y Precios "Desde" (Ej: "Consulta presencial desde S/ 60.00").
-- [ ] Galería de 4-6 fotos para generar confianza (clínica, equipos, espacio).
-- [ ] Ubicación: Dirección exacta vinculada a coordenadas (lat/lng) para el mapa.
-- [ ] Sistema de testimonios de tutores con rating (1-5 estrellas).
-- [ ] Previsualización de disponibilidad de calendario.
+- [x] Formulario unificado de registro: Datos legales (RUC, Empresa) + Datos del Perfil (Título profesional, y selección de primera Especialidad/Servicio).
+- [x] Estado de validación por parte de MasKot (Pendiente, Aprobado, Rechazado, Suspendido).
+- [x] Una vez "Aprobado", el perfil puede publicarse (`is_published = true`) y el profesional obtiene automáticamente los precios especiales en la tienda.
+- [x] Panel de gestión: Configuración de Nombre público, Título (Ej: Médico Veterinario), y gestión de su Catálogo de Servicios (asignando a qué Especialidad del sistema pertenece cada servicio).
+- [x] Experiencia y Resumen (Texto descriptivo + lista de condiciones tratadas `treated_conditions`).
+- [x] Lista de Servicios y Precios "Desde" (Ej: "Consulta presencial desde S/ 60.00").
+- [x] Galería de 4-6 fotos para generar confianza (clínica, equipos, espacio) — `gallery_urls TEXT[]`.
+- [x] Ubicación: Dirección exacta vinculada a coordenadas (lat/lng) para el mapa.
+- [x] Sistema de testimonios de tutores con rating (1-5 estrellas).
+- [x] Previsualización de disponibilidad de calendario.
+- [x] Slug URL amigable auto-generado desde `public_name` (ej: `/professionals/dr-juan-perez`).
+- [x] Indicador de disponibilidad (`is_available`) para mostrar si acepta consultas.
+- [x] Campo WhatsApp (`phone`) para contacto directo.
 
 **Frontend:** `src/features/professionals/pages/ProfessionalRegistrationProfile.tsx`, `ProfessionalProfilePublicPage.tsx`
 
 **Supabase (`07_professional_directory`):**
 
 ```sql
-CREATE TYPE professional_profile_status AS ENUM ('pending', 'approved', 'rejected', 'suspended');
-
 -- Catálogo Maestro de Especialidades (Administrado por MasKot)
 CREATE TABLE professional_specialties (
-    id BIGINT GENERATED BY DEFAULT AS IDENTITY PRIMARY KEY,
+    id BIGINT GENERATED ALWAYS AS IDENTITY NOT NULL,
     name TEXT NOT NULL UNIQUE,
     slug TEXT NOT NULL UNIQUE,
     icon_url TEXT,
     display_order INTEGER NOT NULL DEFAULT 0 CHECK (display_order >= 0),
-    is_active BOOLEAN NOT NULL DEFAULT TRUE
+    is_active BOOLEAN NOT NULL DEFAULT TRUE,
+    CONSTRAINT professional_specialties_pkey PRIMARY KEY (id)
 );
 
 -- Perfil unificado del profesional (Datos legales + Directorio Público)
+-- IMPORTANTE: Schema modificado por 08_professional_directory_seo_patch.sql
+-- Campos adicionales: slug (UNIQUE), is_available (DEFAULT true), phone, treated_conditions
 CREATE TABLE professional_profiles (
-    id BIGINT GENERATED BY DEFAULT AS IDENTITY PRIMARY KEY,
-    profile_id BIGINT UNIQUE NOT NULL REFERENCES profiles(id) ON DELETE CASCADE,
+    id BIGINT GENERATED ALWAYS AS IDENTITY NOT NULL,
+    profile_id BIGINT NOT NULL UNIQUE REFERENCES profiles(id) ON DELETE CASCADE,
     
     -- [1] Datos Legales para validación y facturación
     business_name TEXT NOT NULL,
-    ruc TEXT NOT NULL UNIQUE CHECK (LENGTH(ruc) = 11),
+    ruc TEXT NOT NULL UNIQUE CHECK (length(ruc) = 11),
     legal_document_url TEXT,
     
     -- [2] Estado de Validación MasKot
-    status professional_profile_status NOT NULL DEFAULT 'pending',
+    status USER-DEFINED NOT NULL DEFAULT 'pending'::professional_profile_status,
     approved_by BIGINT REFERENCES profiles(id) ON DELETE SET NULL,
     approved_at TIMESTAMPTZ,
     rejection_reason TEXT,
@@ -1865,39 +1868,97 @@ CREATE TABLE professional_profiles (
     public_name TEXT NOT NULL, 
     title TEXT NOT NULL, 
     experience_summary TEXT,
-    base_price NUMERIC(10, 2),
+    base_price NUMERIC,
     consultation_types TEXT[] DEFAULT '{}',
+    treated_conditions TEXT,
     
     -- [4] Multimedia
     profile_photo_url TEXT,
     gallery_urls TEXT[] DEFAULT '{}',
     
-    -- [5] Localización para Búsqueda y Mapa
-    address_text TEXT NOT NULL,
-    latitude NUMERIC(10, 8),
-    longitude NUMERIC(11, 8),
+    -- [5] SEO y Contacto
+    slug TEXT UNIQUE,
+    is_available BOOLEAN DEFAULT true,
+    phone TEXT,
     
-    -- [6] Métricas de Testimonios
-    average_rating NUMERIC(3, 2) DEFAULT 0.00,
-    total_reviews INTEGER DEFAULT 0,
+    -- [6] Métricas de Testimonios (se actualizan via trigger)
     
-    -- Visibilidad
-    is_published BOOLEAN DEFAULT FALSE,
+    -- Visibilidad y Timestamps
+    is_published BOOLEAN DEFAULT false,
     created_at TIMESTAMPTZ DEFAULT NOW(),
-    updated_at TIMESTAMPTZ DEFAULT NOW()
+    updated_at TIMESTAMPTZ DEFAULT NOW(),
+    
+    CONSTRAINT professional_profiles_pkey PRIMARY KEY (id)
 );
 
--- Servicios ofrecidos por el profesional (Tabla Intermedia entre Especialidad y Profesional)
+-- Índice para búsqueda por slug
+CREATE INDEX IF NOT EXISTS idx_professional_profiles_slug ON professional_profiles(slug) WHERE slug IS NOT NULL;
+
+-- Trigger auto-genera slug desde public_name antes de insert
+CREATE OR REPLACE FUNCTION set_professional_slug_on_insert() RETURNS TRIGGER AS $$
+BEGIN
+    IF NEW.slug IS NULL OR NEW.slug = '' THEN
+        NEW.slug := generate_professional_slug(NEW.public_name);
+    END IF;
+    RETURN NEW;
+END;
+$$ LANGUAGE plpgsql;
+
+DROP TRIGGER IF EXISTS trg_set_professional_slug ON professional_profiles;
+CREATE TRIGGER trg_set_professional_slug
+    BEFORE INSERT ON professional_profiles
+    FOR EACH ROW EXECUTE FUNCTION set_professional_slug_on_insert();
+
+-- Servicios ofrecidos por el profesional
 CREATE TABLE professional_services (
-    id BIGINT GENERATED BY DEFAULT AS IDENTITY PRIMARY KEY,
+    id BIGINT GENERATED ALWAYS AS IDENTITY NOT NULL,
     professional_profile_id BIGINT NOT NULL REFERENCES professional_profiles(id) ON DELETE CASCADE,
     professional_specialty_id BIGINT NOT NULL REFERENCES professional_specialties(id) ON DELETE CASCADE,
-    
     name TEXT NOT NULL,
     description TEXT,
-    price NUMERIC(10, 2),
-    is_active BOOLEAN NOT NULL DEFAULT TRUE
+    price NUMERIC,
+    is_active BOOLEAN NOT NULL DEFAULT TRUE,
+    CONSTRAINT professional_services_pkey PRIMARY KEY (id)
 );
+
+-- ============================================================
+-- Direcciones/Ubicaciones del Profesional (Modelo LEGACY)
+-- Un profesional puede tener VARIAS clínicas/consultorios
+-- NOTA: Esta tabla es el modelo ANTIGUO. Será reemplazada por
+-- la nueva tabla professional_addresses (modelo v2 completo).
+-- ============================================================
+CREATE TABLE professional_addresses_legacy (
+    id BIGINT GENERATED ALWAYS AS IDENTITY NOT NULL,
+    professional_profile_id BIGINT NOT NULL REFERENCES professional_profiles(id) ON DELETE CASCADE,
+    
+    -- Datos de la ubicación
+    label TEXT NOT NULL,                    -- "Clínica San Miguel", "Consultorio Lince"
+    address_text TEXT NOT NULL,
+    latitude NUMERIC,
+    longitude NUMERIC,
+    phone TEXT,
+    is_primary BOOLEAN DEFAULT false,      -- Dirección principal para búsqueda
+    
+    -- Configuración de atención
+    is_active BOOLEAN DEFAULT true,
+    
+    created_at TIMESTAMPTZ DEFAULT NOW(),
+    updated_at TIMESTAMPTZ DEFAULT NOW(),
+    
+    CONSTRAINT professional_addresses_legacy_pkey PRIMARY KEY (id),
+    CONSTRAINT professional_addresses_legacy_professional_fkey
+        FOREIGN KEY (professional_profile_id) REFERENCES public.professional_profiles(id) ON DELETE CASCADE
+);
+
+-- Índice para buscar profesionales por ubicación
+CREATE INDEX idx_professional_addresses_legacy_location
+    ON professional_addresses_legacy(latitude, longitude)
+    WHERE is_active = true;
+
+-- Índice para buscar direcciones por profesional
+CREATE INDEX idx_professional_addresses_legacy_professional
+    ON professional_addresses_legacy(professional_profile_id)
+    WHERE is_active = true;
 
 -- Semilla de Especialidades (Catálogo Central)
 INSERT INTO professional_specialties (name, slug, display_order) VALUES
@@ -1908,24 +1969,61 @@ INSERT INTO professional_specialties (name, slug, display_order) VALUES
 ('Grooming y Estética', 'grooming', 50),
 ('Entrenamiento', 'entrenamiento', 60),
 ('Rehabilitación', 'rehabilitacion', 70);
+```
 
--- RPC: Solicitar ser profesional
+**RPCs implementados (Fase 2 — `07_professional_directory_rpc.sql` + `07_professional_profile_rpc.sql`):**
+
+```sql
+-- Solicitar registro profesional (crea perfil + servicio base)
 CREATE OR REPLACE FUNCTION create_professional_account_request(
-    p_business_name TEXT,
-    p_ruc TEXT,
-    p_public_name TEXT,
-    p_title TEXT,
-    p_address_text TEXT,
-    p_specialty_id BIGINT
-) RETURNS JSONB AS $$ $$ LANGUAGE plpgsql SECURITY DEFINER;
+    p_profile_id BIGINT, p_business_name TEXT, p_ruc TEXT, p_address_text TEXT,
+    p_public_name TEXT, p_title TEXT, p_document_url TEXT, p_specialty_id INTEGER,
+    p_latitude NUMERIC DEFAULT NULL, p_longitude NUMERIC DEFAULT NULL
+) RETURNS JSONB AS $$ ... $$ LANGUAGE plpgsql SECURITY DEFINER;
 
--- RPC: Obtener catálogo B2B
-CREATE OR REPLACE FUNCTION get_professional_products(p_profile_id BIGINT)
-RETURNS JSONB AS $$ $$ LANGUAGE plpgsql SECURITY DEFINER;
-
--- RPC: Validar chequeo de beneficios
+-- Verificar elegibilidad profesional del usuario
 CREATE OR REPLACE FUNCTION check_professional_eligibility(p_profile_id BIGINT)
-RETURNS JSONB AS $$ $$ LANGUAGE plpgsql SECURITY DEFINER;
+RETURNS JSONB AS $$ ... $$ LANGUAGE plpgsql SECURITY DEFINER;
+
+-- Obtener productos B2B con precio profesional aplicado
+CREATE OR REPLACE FUNCTION get_professional_products(p_profile_id BIGINT)
+RETURNS TABLE (...) AS $$ ... $$ LANGUAGE plpgsql SECURITY DEFINER;
+
+-- Obtener perfil completo con servicios y disponibilidad
+CREATE OR REPLACE FUNCTION get_professional_full_profile(p_profile_id BIGINT)
+RETURNS JSONB AS $$ ... $$ LANGUAGE plpgsql SECURITY DEFINER;
+
+-- Actualizar perfil (todos los campos editables)
+CREATE OR REPLACE FUNCTION update_professional_profile(
+    p_profile_id BIGINT, p_public_name TEXT DEFAULT NULL, p_title TEXT DEFAULT NULL,
+    p_experience_summary TEXT DEFAULT NULL, p_treated_conditions TEXT[] DEFAULT NULL,
+    p_base_price NUMERIC DEFAULT NULL, p_consultation_types TEXT[] DEFAULT NULL,
+    p_address_text TEXT DEFAULT NULL, p_profile_photo_url TEXT DEFAULT NULL,
+    p_gallery_urls TEXT[] DEFAULT NULL, p_is_available BOOLEAN DEFAULT NULL,
+    p_phone TEXT DEFAULT NULL, p_slug TEXT DEFAULT NULL
+) RETURNS JSONB AS $$ ... $$ LANGUAGE plpgsql SECURITY DEFINER;
+
+-- Agregar/actualizar servicio profesional
+CREATE OR REPLACE FUNCTION upsert_professional_service(
+    p_profile_id BIGINT, p_specialty_id BIGINT, p_name TEXT,
+    p_description TEXT DEFAULT NULL, p_price NUMERIC DEFAULT 0,
+    p_is_active BOOLEAN DEFAULT true, p_service_id BIGINT DEFAULT NULL
+) RETURNS JSONB AS $$ ... $$ LANGUAGE plpgsql SECURITY DEFINER;
+
+-- Desactivar servicio profesional
+CREATE OR REPLACE FUNCTION delete_professional_service(
+    p_profile_id BIGINT, p_service_id BIGINT
+) RETURNS JSONB AS $$ ... $$ LANGUAGE plpgsql SECURITY DEFINER;
+
+-- Configurar disponibilidad (upsert + deactivate faltantes)
+CREATE OR REPLACE FUNCTION set_professional_availability(
+    p_profile_id BIGINT, p_slots JSONB
+) RETURNS JSONB AS $$ ... $$ LANGUAGE plpgsql SECURITY DEFINER;
+
+-- Publicar/despublicar perfil
+CREATE OR REPLACE FUNCTION toggle_professional_publication(
+    p_profile_id BIGINT, p_publish BOOLEAN DEFAULT NULL
+) RETURNS JSONB AS $$ ... $$ LANGUAGE plpgsql SECURITY DEFINER;
 ```
 
 ---
@@ -1940,140 +2038,400 @@ RETURNS JSONB AS $$ $$ LANGUAGE plpgsql SECURITY DEFINER;
 
 **Criterios de Aceptación:**
 
-- [ ] Barra de filtros: Categoría (specialty), Etiqueta (consultation_type), Ordenar por (rating/precio/nombre), Buscar (texto libre).
-- [ ] Chips de filtros activos removibles.
-- [ ] Split-View (Desktop) y Toggle (Mobile): 
-  - [ ] Lado izquierdo: Listado de tarjetas de profesionales.
-  - [ ] Lado derecho: Mapa interactivo (Google Maps) con pins por profesional.
-- [ ] Tarjeta de Profesional: Foto, public_name, title, average_rating con estrellas, address_text, consultation_types, base_price.
-- [ ] Mapa con markers, bounds automáticos, botón "Ampliar mapa", InfoWindow en click.
+- [x] Barra de filtros: Categoría (specialty), Etiqueta (consultation_type), Ordenar por (rating/precio/nombre), Buscar (texto libre).
+- [x] Chips de filtros activos removibles.
+- [x] Split-View (Desktop) y Toggle (Mobile): 
+  - [x] Lado izquierdo: Listado de tarjetas de profesionales.
+  - [x] Lado derecho: Mapa interactivo (Google Maps) con pins por profesional.
+- [x] Tarjeta de Profesional: Foto, public_name, title, average_rating con estrellas, address_text, consultation_types, base_price, slug, is_available, phone.
+- [x] Mapa con markers, bounds automáticos, botón "Ampliar mapa", InfoWindow en click.
 
 **Frontend:** `src/features/directory/pages/SpecialistsPage.tsx`  
 **Componentes:** `SpecialistsFilterBar.tsx`, `ProfessionalCard.tsx`, `GoogleMapView.tsx`
 
-**Supabase (`07_professional_directory`):**
+**RPCs implementados (`07_professional_public_rpc.sql`):**
 
 ```sql
--- La búsqueda en el directorio se hace mayormente consumiendo directamente desde supabase con filtros.
+-- Listar profesionales publicados (para SpecialistsPage)
+-- Retorna: id, slug, public_name, title, profile_photo_url, address_text,
+--          latitude, longitude, base_price, consultation_types, average_rating,
+--          total_reviews, specialty_name, specialty_slug, is_published,
+--          experience_summary, is_available, phone
+CREATE OR REPLACE FUNCTION get_public_professionals(
+    p_specialty_id BIGINT DEFAULT NULL,
+    p_consultation_type TEXT DEFAULT NULL,
+    p_search TEXT DEFAULT NULL,
+    p_location TEXT DEFAULT NULL,
+    p_sort_by TEXT DEFAULT 'rating'
+) RETURNS TABLE (...) AS $$ ... $$ LANGUAGE plpgsql SECURITY INVOKER;
+
+-- Listar todos los profesionales (admin)
+CREATE OR REPLACE FUNCTION get_all_professionals()
+RETURNS TABLE (...) AS $$ ... $$ LANGUAGE plpgsql SECURITY DEFINER;
 ```
 
 ---
 
-### HU-7.4: Herramienta de Agendamiento de Citas
+### HU-12.4: Herramienta de Agendamiento de Citas
 
-**User Story:** Como usuario, quiero ver la información completa de un profesional y reservar una franja horaria para atender a mi mascota.
+**User Story:** Como cliente, quiero solicitar una cita con el profesional indicando fecha, hora y dirección de preferencia. El profesional podrá aceptar o rechazar mi solicitud, y solo cuando marque la atención como completada podré dejar un testimonio.
 
 **Criterios de Aceptación:**
 
-- [ ] Bloque lateral tipo Widget "Booking" en la ficha del profesional.
-- [ ] Selector principal de Motivo de Citas.
-- [ ] Grilla de Horarios interactiva con franjas de disponibilidad.
-- [ ] Sistema de Testimonios (solo clientes que cruzaron por la pasarela de citas completadas).
+- [x] Bloque lateral tipo Widget "RequestWidget" en la ficha del profesional.
+- [x] Selector de Dirección: el profesional puede tener varias direcciones, el cliente elige cuál le queda más cómoda.
+- [x] Selector de Fecha: muestra calendario con días disponibles según la disponibilidad configurada por el profesional para esa dirección.
+- [x] Selector de Hora: muestra franjas horarias disponibles para la fecha seleccionada.
+- [x] Selector de Servicio (motivo de la consulta).
+- [x] Datos del cliente: nombre de la mascota, descripción del problema.
+- [x] El cliente ve la disponibilidad pero NO reserva un slot — solo envía una solicitud.
+- [x] El slot disponible NO se bloquea al enviar la solicitud (queda disponible para otros hasta que el profesional lo deshabilite manualmente).
 
-**Frontend:** `src/features/directory/pages/ProfessionalDetailPage.tsx`, `BookingWidget.tsx`
+**Flujo completo:**
+
+```
+CLIENTE                    PROFESIONAL                   SISTEMA
+   │                           │                            │
+   ├── Ver disponibilidad ────►│                            │
+   │   (por dirección/fecha)  │                            │
+   │                           │                            │
+   ├── SUBMIT REQUEST ─────────┼───────────────────────────►│
+   │   (fecha, hora, dirección, │                            │
+   │    servicio, motivo,       │                            │
+   │    datos mascota)          │                            │
+   │                           │                            │
+   │                      ┌─────┴─────┐                     │
+   │                      │  PENDING  │                     │
+   │                      └─────┬─────┘                     │
+   │                           │                            │
+   │                           │◄── NOTIFY (email/push) ────│
+   │                           │                            │
+   │                           ├── ACCEPT ─────────────────►│
+   │                           │    (slot sigue disponible) │
+   │                           │                            │
+   │◄── STATUS: ACCEPTED ───────┤                           │
+   │                           │                            │
+   │                           ├── REJECT ─────────────────►│
+   │                           │    (con motivo)            │
+   │                           │                            │
+   │◄── STATUS: REJECTED ───────┤    (con motivo visible)   │
+   │   + motivo                │                            │
+   │                           │                            │
+   │                           ├── DISABLE SLOT ───────────►│
+   │                           │    (deshabilita fecha/hora)│
+   │                           │                            │
+   │                           ├── COMPLETE ───────────────►│
+   │                           │    (habilita review)       │
+   │                           │                            │
+   │◄── REVIEW ENABLED ─────────┤                           │
+   │                           │                            │
+   ├── SUBMIT REVIEW ──────────┼───────────────────────────►│
+   │   (rating 1-5 + comment)  │                            │
+```
+
+**Frontend:** `src/features/directory/pages/ProfessionalDetailPage.tsx`, `RequestWidget.tsx`
 
 **Supabase (`07_professional_directory`):**
 
 ```sql
-CREATE TYPE professional_appointment_status AS ENUM ('pending', 'confirmed', 'completed', 'cancelled', 'no_show');
+-- ============================================================
+-- NUEVAS TABLAS: Modelo Doctoralia-style v2 (01_update_sql_professional_part1.sql)
+-- Conviven con las tablas legacy: professional_addresses (v1), professional_availability,
+-- professional_appointments. El frontend LEGACY usa las v1. El frontend NUEVO usa v2.
+-- ============================================================
 
--- Horarios disponibles
-CREATE TABLE professional_availability (
-    id BIGINT GENERATED BY DEFAULT AS IDENTITY PRIMARY KEY,
+-- ENUM: Estados de solicitud de cita
+DO $$
+BEGIN
+    IF NOT EXISTS (SELECT 1 FROM pg_type WHERE typname = 'appointment_request_status') THEN
+        CREATE TYPE appointment_request_status AS ENUM (
+            'pending', 'accepted', 'rejected', 'cancelled', 'completed', 'no_show'
+        );
+    END IF;
+END $$;
+
+-- professional_addresses: Direcciones con estructura completa
+CREATE TABLE professional_addresses (
+    id BIGINT GENERATED ALWAYS AS IDENTITY PRIMARY KEY,
     professional_profile_id BIGINT NOT NULL REFERENCES professional_profiles(id) ON DELETE CASCADE,
-    day_of_week INTEGER NOT NULL CHECK (day_of_week BETWEEN 0 AND 6),
-    start_time TIME NOT NULL,
-    end_time TIME NOT NULL,
-    is_active BOOLEAN NOT NULL DEFAULT TRUE
-);
 
--- Citas/Reservas agendadas
-CREATE TABLE professional_appointments (
-    id BIGINT GENERATED BY DEFAULT AS IDENTITY PRIMARY KEY,
-    professional_profile_id BIGINT NOT NULL REFERENCES professional_profiles(id),
-    client_profile_id BIGINT NOT NULL REFERENCES profiles(id),
-    service_id BIGINT REFERENCES professional_services(id),
-    
-    appointment_date DATE NOT NULL,
-    start_time TIME NOT NULL,
-    end_time TIME NOT NULL,
-    
-    is_first_visit BOOLEAN DEFAULT TRUE,
-    status professional_appointment_status DEFAULT 'pending',
-    
+    name TEXT NOT NULL DEFAULT 'Consultorio principal',
+    address_line TEXT NOT NULL,
+    reference TEXT,
+    district TEXT NOT NULL,
+    province TEXT NOT NULL DEFAULT 'Lima',
+    department TEXT NOT NULL DEFAULT 'Lima',
+    latitude NUMERIC,
+    longitude NUMERIC,
+    phone TEXT,
+
+    is_primary BOOLEAN NOT NULL DEFAULT false,
+    is_active BOOLEAN NOT NULL DEFAULT true,
+
     created_at TIMESTAMPTZ DEFAULT NOW(),
     updated_at TIMESTAMPTZ DEFAULT NOW()
 );
 
--- Testimonios validados
-CREATE TABLE professional_reviews (
-    id BIGINT GENERATED BY DEFAULT AS IDENTITY PRIMARY KEY,
-    professional_appointment_id BIGINT UNIQUE REFERENCES professional_appointments(id),
+CREATE UNIQUE INDEX idx_unique_primary_address_per_professional
+    ON professional_addresses(professional_profile_id) WHERE is_primary = true;
+CREATE INDEX idx_professional_addresses_location
+    ON professional_addresses(district, province, department) WHERE is_active = true;
+
+-- professional_address_availability: Disponibilidad por fecha exacta
+CREATE TABLE professional_address_availability (
+    id BIGINT GENERATED ALWAYS AS IDENTITY PRIMARY KEY,
+    professional_address_id BIGINT NOT NULL REFERENCES professional_addresses(id) ON DELETE CASCADE,
+
+    availability_date DATE NOT NULL,
+    start_time TIME NOT NULL,
+    end_time TIME NOT NULL,
+    available_slots TIME[] NOT NULL DEFAULT '{}',
+    is_active BOOLEAN DEFAULT true,
+    notes TEXT,
+
+    CONSTRAINT professional_address_availability_unq UNIQUE (professional_address_id, availability_date),
+    CONSTRAINT professional_address_availability_time_check CHECK (end_time > start_time)
+);
+
+CREATE INDEX idx_address_availability_date ON professional_address_availability(availability_date) WHERE is_active = true;
+CREATE INDEX idx_address_availability_address_date ON professional_address_availability(professional_address_id, availability_date) WHERE is_active = true;
+
+-- professional_appointment_requests: Solicitudes de cita (NO reservas duras)
+CREATE TABLE professional_appointment_requests (
+    id BIGINT GENERATED ALWAYS AS IDENTITY PRIMARY KEY,
+
     professional_profile_id BIGINT NOT NULL REFERENCES professional_profiles(id),
     client_profile_id BIGINT NOT NULL REFERENCES profiles(id),
-    
-    rating INTEGER NOT NULL CHECK (rating BETWEEN 1 AND 5),
-    comment TEXT,
-    created_at TIMESTAMPTZ DEFAULT NOW()
+    professional_address_id BIGINT NOT NULL REFERENCES professional_addresses(id),
+    service_id BIGINT REFERENCES professional_services(id),
+
+    requested_date DATE NOT NULL,
+    requested_time TIME NOT NULL,
+    pet_name TEXT,
+    pet_description TEXT,
+    reason TEXT NOT NULL,
+
+    status appointment_request_status NOT NULL DEFAULT 'pending',
+    rejection_reason TEXT,
+    responded_at TIMESTAMPTZ,
+    internal_notes TEXT,
+    completed_at TIMESTAMPTZ,
+
+    created_at TIMESTAMPTZ DEFAULT NOW(),
+    updated_at TIMESTAMPTZ DEFAULT NOW()
 );
+
+CREATE INDEX idx_appointment_requests_professional_client ON professional_appointment_requests(professional_profile_id, client_profile_id);
+CREATE INDEX idx_appointment_requests_status ON professional_appointment_requests(status);
+CREATE INDEX idx_appointment_requests_address_date ON professional_appointment_requests(professional_address_id, requested_date);
+
+-- professional_reviews: Nuevas columnas para vincular a requests
+ALTER TABLE professional_reviews ADD COLUMN appointment_request_id BIGINT;
+ALTER TABLE professional_reviews ADD COLUMN professional_response TEXT;
+ALTER TABLE professional_reviews ADD COLUMN responded_at TIMESTAMPTZ;
+
+ALTER TABLE professional_reviews ADD CONSTRAINT professional_reviews_appointment_request_id_fkey
+    FOREIGN KEY (appointment_request_id) REFERENCES professional_appointment_requests(id) ON DELETE CASCADE;
+
+CREATE UNIQUE INDEX idx_unique_review_per_appointment_request
+    ON professional_reviews(appointment_request_id) WHERE appointment_request_id IS NOT NULL;
+
+-- Trigger: Actualizar average_rating y total_reviews en professional_profiles
+CREATE OR REPLACE FUNCTION update_professional_rating_stats() RETURNS TRIGGER AS $$
+BEGIN
+    UPDATE professional_profiles SET
+        average_rating = COALESCE((SELECT ROUND(AVG(rating)::numeric, 2) FROM professional_reviews WHERE professional_profile_id = NEW.professional_profile_id), 0),
+        total_reviews = COALESCE((SELECT COUNT(*) FROM professional_reviews WHERE professional_profile_id = NEW.professional_profile_id), 0),
+        updated_at = NOW()
+    WHERE id = COALESCE(NEW.professional_profile_id, OLD.professional_profile_id);
+    RETURN COALESCE(NEW, OLD);
+END;
+$$ LANGUAGE plpgsql;
+
+DROP TRIGGER IF EXISTS trg_update_professional_rating ON professional_reviews;
+CREATE TRIGGER trg_update_professional_rating
+    AFTER INSERT OR UPDATE OR DELETE ON professional_reviews
+    FOR EACH ROW EXECUTE FUNCTION update_professional_rating_stats();
+```
+
+**RPCs nuevos para el modelo v2 (`01_update_sql_professional_part1.sql` + `01_update_sql_professional_part2.sql`):**
+
+```sql
+-- Disponibilidad por dirección y rango de fechas
+CREATE OR REPLACE FUNCTION get_address_availability(
+    p_address_id BIGINT, p_date_from DATE, p_date_to DATE
+) RETURNS TABLE (...) AS $$ ... $$ LANGUAGE plpgsql SECURITY INVOKER;
+
+-- Slots disponibles para una fecha específica
+CREATE OR REPLACE FUNCTION get_address_day_slots(
+    p_address_id BIGINT, p_date DATE
+) RETURNS JSONB AS $$ ... $$ LANGUAGE plpgsql SECURITY INVOKER;
+
+-- CRUD de direcciones del profesional
+CREATE OR REPLACE FUNCTION upsert_professional_address(
+    p_profile_id BIGINT, p_address_id BIGINT DEFAULT NULL,
+    p_name TEXT, p_address_line TEXT, p_reference TEXT,
+    p_district TEXT, p_province TEXT, p_department TEXT,
+    p_latitude NUMERIC, p_longitude NUMERIC, p_phone TEXT,
+    p_is_primary BOOLEAN DEFAULT false, p_is_active BOOLEAN DEFAULT true
+) RETURNS JSONB AS $$ ... $$ LANGUAGE plpgsql SECURITY DEFINER;
+
+-- CRUD de disponibilidad por dirección
+CREATE OR REPLACE FUNCTION set_address_availability(
+    p_address_id BIGINT, p_availability JSONB
+) RETURNS JSONB AS $$ ... $$ LANGUAGE plpgsql SECURITY DEFINER;
+
+-- Solicitar cita (cliente)
+CREATE OR REPLACE FUNCTION create_appointment_request(
+    p_professional_id BIGINT, p_client_profile_id BIGINT, p_address_id BIGINT,
+    p_service_id BIGINT DEFAULT NULL, p_requested_date DATE, p_requested_time TIME,
+    p_pet_name TEXT DEFAULT NULL, p_pet_description TEXT DEFAULT NULL, p_reason TEXT
+) RETURNS JSONB AS $$ ... $$ LANGUAGE plpgsql SECURITY DEFINER;
+
+-- Profesional: Aceptar / Rechazar / Completar solicitud
+CREATE OR REPLACE FUNCTION accept_appointment_request(
+    p_request_id BIGINT, p_professional_id BIGINT
+) RETURNS JSONB AS $$ ... $$ LANGUAGE plpgsql SECURITY DEFINER;
+
+CREATE OR REPLACE FUNCTION reject_appointment_request(
+    p_request_id BIGINT, p_professional_id BIGINT, p_reason TEXT
+) RETURNS JSONB AS $$ ... $$ LANGUAGE plpgsql SECURITY DEFINER;
+
+CREATE OR REPLACE FUNCTION complete_appointment_request(
+    p_request_id BIGINT, p_professional_id BIGINT
+) RETURNS JSONB AS $$ ... $$ LANGUAGE plpgsql SECURITY DEFINER;
+
+-- Cliente: Crear review (solo si appointment_request está completed)
+CREATE OR REPLACE FUNCTION create_professional_review(
+    p_request_id BIGINT, p_client_profile_id BIGINT, p_rating INTEGER, p_comment TEXT DEFAULT NULL
+) RETURNS JSONB AS $$ ... $$ LANGUAGE plpgsql SECURITY DEFINER;
+
+-- Profesional: Responder a review
+CREATE OR REPLACE FUNCTION respond_professional_review(
+    p_review_id BIGINT, p_professional_id BIGINT, p_response TEXT
+) RETURNS JSONB AS $$ ... $$ LANGUAGE plpgsql SECURITY DEFINER;
 ```
 
 ---
 
-### HU-7.5: Beneficios Tienda para Profesionales (Descuentos)
+### HU-12.5: Beneficios Tienda para Profesionales (Descuentos)
 
-**User Story:** Como profesional habilitado en el Directorio, quiero acceder automáticamente a precios mayoristas al comprar en la tienda MasKot.
+**User Story:** Como cliente, quiero solicitar una cita con el profesional indicando fecha, hora y dirección de preferencia. El profesional podrá aceptar o rechazar mi solicitud, y solo cuando marque la atención como completada podré dejar un testimonio.
 
 **Criterios de Aceptación:**
 
-- [ ] Si el usuario tiene un perfil asociado en `professional_profiles` con `status = 'approved'`, la tienda renderiza la vista mayorista.
-- [ ] Aplicación de `professional_discount_pct` extraído de la tabla `products`.
-- [ ] Formatos Industriales compatibles dinámicamente con el descuento.
+- [x] Bloque lateral tipo Widget "RequestWidget" en la ficha del profesional.
+- [x] Selector de Dirección: el profesional puede tener varias direcciones, el cliente elige cuál le queda más cómoda.
+- [x] Selector de Fecha: muestra calendario con días disponibles según la disponibilidad configurada por el profesional para esa dirección.
+- [x] Selector de Hora: muestra franjas horarias disponibles para la fecha seleccionada.
+- [x] Selector de Servicio (motivo de la consulta).
+- [x] Datos del cliente: nombre de la mascota, descripción del problema.
+- [x] El cliente ve la disponibilidad pero NO reserva un slot — solo envía una solicitud.
+- [x] El slot disponible NO se bloquea al enviar la solicitud (queda disponible para otros hasta que el profesional lo deshabilite manualmente).
 
-**Frontend:** `src/features/store/hooks/useProfessionalDiscount.ts`
+**Frontend:** `src/features/directory/pages/ProfessionalDetailPage.tsx`, `RequestWidget.tsx`
 
-**Supabase (`07_professional_directory`):**
+---
+
+### TABLAS COMPLEMENTARIAS DEL DIRECTORIO (01_update_sql_professional_part2.sql)
+
+> Estas tablas son **opcionales para el MVP** — el perfil público funciona sin ellas. Se incluyen para hacer más completo el Directorio estilo Doctoralia.
 
 ```sql
--- Lógica inyectada en las Queries de Catálogo y Carrito evaluando el rol del perfil autenticado,
--- multiplicando "variant_price * (1 - (professional_discount_pct / 100))"
+-- Experiencia, formación, certificaciones y premios
+CREATE TABLE professional_experience_items (
+    id BIGINT GENERATED ALWAYS AS IDENTITY PRIMARY KEY,
+    professional_profile_id BIGINT NOT NULL REFERENCES professional_profiles(id) ON DELETE CASCADE,
+
+    type TEXT NOT NULL CHECK (type IN ('education', 'experience', 'certification', 'award')),
+    title TEXT NOT NULL,
+    institution TEXT,
+    description TEXT,
+    start_year INTEGER,
+    end_year INTEGER,
+    display_order INTEGER NOT NULL DEFAULT 0 CHECK (display_order >= 0),
+
+    created_at TIMESTAMPTZ DEFAULT NOW(),
+    updated_at TIMESTAMPTZ DEFAULT NOW()
+);
+
+CREATE INDEX idx_professional_experience_profile
+    ON professional_experience_items(professional_profile_id, display_order);
+
+-- Servicios disponibles por dirección (no todas las sedes ofrecen todos los servicios)
+CREATE TABLE professional_address_services (
+    id BIGINT GENERATED ALWAYS AS IDENTITY PRIMARY KEY,
+    professional_address_id BIGINT NOT NULL REFERENCES professional_addresses(id) ON DELETE CASCADE,
+    professional_service_id BIGINT NOT NULL REFERENCES professional_services(id) ON DELETE CASCADE,
+
+    is_active BOOLEAN NOT NULL DEFAULT true,
+    created_at TIMESTAMPTZ DEFAULT NOW(),
+
+    CONSTRAINT professional_address_services_unique
+        UNIQUE (professional_address_id, professional_service_id)
+);
+
+-- Preguntas frecuentes del profesional
+CREATE TABLE professional_faqs (
+    id BIGINT GENERATED ALWAYS AS IDENTITY PRIMARY KEY,
+    professional_profile_id BIGINT NOT NULL REFERENCES professional_profiles(id) ON DELETE CASCADE,
+
+    question TEXT NOT NULL,
+    answer TEXT NOT NULL,
+    display_order INTEGER NOT NULL DEFAULT 0 CHECK (display_order >= 0),
+    is_active BOOLEAN NOT NULL DEFAULT true,
+
+    created_at TIMESTAMPTZ DEFAULT NOW(),
+    updated_at TIMESTAMPTZ DEFAULT NOW()
+);
+
+CREATE INDEX idx_professional_faqs_profile
+    ON professional_faqs(professional_profile_id, display_order) WHERE is_active = true;
 ```
 
 ---
 
-## 📊 Estructura de Archivos SQL
+### TABLAS LEGACY (No usar en nuevo desarrollo — mantener por compatibilidad frontend)
+
+```sql
+-- DEPRECATED: Usar professional_addresses + professional_address_availability
+CREATE TABLE professional_availability (...);  -- Modelo antiguo: day_of_week recurring
+
+-- DEPRECATED: Usar professional_appointment_requests (con estados pending/accepted/rejected/completed)
+CREATE TABLE professional_appointments (...);   -- Modelo antiguo: reservas duras con slots bloqueados
+
+-- DEPRECATED: Usar professional_addresses (modelo estructurado con district/province)
+CREATE TABLE professional_addresses (...);      -- Modelo v1 con label + address_text simples
+```
+
+---
+
+## 📊 Estructura de Archivos SQL (Actualizada 2026-06-02)
 
 ```text
-supabase/
+docs/supabase/
 ├── 01_identity_landings/
-│   ├── 01_identity_landings_rpc.sql       # Fase 2
-│   ├── 01_identity_landings_perf.sql      # Fase 3
-│   └── 01_identity_landings_rls.sql       # Fase 3
 ├── 02_store_ecommerce/
-│   ├── 02_store_ecommerce_rpc.sql
-│   ├── 02_store_ecommerce_perf.sql
-│   └── 02_store_ecommerce_rls.sql
 ├── 03_checkout_subscriptions/
-│   ├── 03_checkout_subscriptions_rpc.sql
-│   ├── 03_checkout_subscriptions_perf.sql
-│   └── 03_checkout_subscriptions_rls.sql
 ├── 04_legal_compliance/
-│   ├── 04_legal_compliance_rpc.sql
-│   ├── 04_legal_compliance_perf.sql
-│   └── 04_legal_compliance_rls.sql
 ├── 05_admin_backoffice/
-│   ├── 05_admin_backoffice_rpc.sql
-│   ├── 05_admin_backoffice_perf.sql
-│   └── 05_admin_backoffice_rls.sql
 ├── 06_complementary/
-│   ├── 06_complementary_rpc.sql
-│   ├── 06_complementary_perf.sql
-│   └── 06_complementary_rls.sql
-└── 07_b2b_professional/
-    ├── 07_b2b_professional_rpc.sql
-    ├── 07_b2b_professional_perf.sql
-    └── 07_b2b_professional_rls.sql
+└── 07_professional_directory/
+    ├── 07_professional_directory_rpc.sql      -- Registro + Admin + Catálogo B2B (actualizado v2)
+    ├── 07_professional_profile_rpc.sql         -- Perfil + Servicios (actualizado v2)
+    ├── 07_professional_public_rpc.sql         -- Público + Búsqueda (actualizado v2)
+    ├── 07_professional_directory_rls.sql       -- RLS Policies (actualizado v2)
+    ├── 08_professional_directory_seo_patch.sql -- Patch: slug, is_available, phone (actualizado)
+    ├── 01_update_sql_professional_part1.sql   -- Modelo Doctoralia v2 (tablas)
+    ├── 01_update_sql_professional_part1_rpc.sql -- RPCs del modelo v2
+    └── 01_update_sql_professional_part2.sql  -- Tablas complementarias (experience, FAQs)
 ```
+
+**Nota:** Los archivos `01_update_sql_professional_part1.sql` y `01_update_sql_professional_part2.sql` implementan el modelo Doctoralia-style v2 con:
+- `professional_addresses` (estructura completa con district/province/department)
+- `professional_address_availability` (slots por fecha exacta)
+- `professional_appointment_requests` (solicitudes con workflow pending/accept/reject/complete)
+- `professional_experience_items`, `professional_address_services`, `professional_faqs` (complementarias)
 
 ---
 
@@ -2081,29 +2439,29 @@ supabase/
 
 ### Must Have (MVP)
 
-- HU-1.1: Home Page
-- HU-2.1, 2.2, 2.3: Catálogo y Carrito
-- **HU-2.4: Calculadora de Ración** ⭐
-- HU-3.1: Checkout simplificado
-- HU-4.1, 4.2: Legal + Libro Reclamaciones
-- HU-6.1: Autenticación
-- **HU-7.2, 7.3: Registro y Catálogo B2B** ⭐
+- HU-1.1: Landing Page
+- HU-2.1, 2.2: Tienda y Catálogo
+- HU-3.1: Carrito de Compras
+- HU-4.1: Checkout simplificado
+- HU-5.1–6.2: Cuenta de Usuario e Historial de Pedidos
+- HU-8.1, 8.2: Legal + Libro de Reclamaciones
+- **HU-12.2, 12.3: Registro y Búsqueda B2B** ⭐
 
 ### Should Have
 
-- HU-3.2: Gestión de Suscripción
-- HU-5.1, 5.2, 5.3: Admin básico
-- **HU-5.4: Gestión Cuentas B2B** ⭐
-- HU-6.2: Notificaciones
+- HU-7.1: Gestión de Suscripciones
+- HU-11.1, 11.4, 10.1: Admin básico (Pedidos, Reportes, Inventario)
+- **HU-11.6: Validación Cuentas B2B** ⭐
+- HU-6.1, 6.2: Historial de Pedidos (Usuario)
 
 ### Could Have
 
 - HU-1.2, 1.3: Nosotros y Blog
-- **HU-7.1: Landing Page del Directorio Profesional** ⭐
-- **HU-7.4: Formatos Industriales** ⭐
+- **HU-12.1: Landing Page del Directorio de Especialistas** ⭐
+- **HU-12.4: Agendamiento de Citas** ⭐
 
 ---
 
 *MasKot - MVP Simplificado - Modelo AltuDog*  
 *Fase 1: Definición & Arquitectura*  
-*Última actualización: 2026-02-16*
+*Última actualización: 2026-03-29*

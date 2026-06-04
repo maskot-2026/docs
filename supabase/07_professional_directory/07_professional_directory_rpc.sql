@@ -1,28 +1,32 @@
 -- ============================================================================
 -- MassKot | Professional Directory Channel Module (07_professional_directory_rpc.sql)
--- RPC Implementations - Fase 2
+-- RPC Implementations
+--
+-- ACTUALIZADO: 2026-06-02
+-- El modelo v2 usa professional_addresses para las direcciones.
+-- El registro ahora no requiere address_text (se crea dirección via RPC).
 -- ============================================================================
 
 -- ============================================================================
 -- HU-7.1: Registro Profesional
+-- ACTUALIZADO: Ya no requiere address_text en el registro.
+-- La dirección se crea posteriormente via upsert_professional_address.
 -- ============================================================================
 
 -- RPC: Crear solicitud de cuenta profesional
 -- Nota: Si en algún deploy previo se creó la misma función con distinto ORDEN de parámetros,
 -- PostgREST puede fallar con PGRST203 (ambigüedad entre overloads). Dropeamos ambas firmas.
-DROP FUNCTION IF EXISTS create_professional_account_request(BIGINT, TEXT, TEXT, TEXT, TEXT, TEXT, TEXT, INTEGER, NUMERIC, NUMERIC);
-DROP FUNCTION IF EXISTS create_professional_account_request(BIGINT, TEXT, TEXT, TEXT, TEXT, TEXT, INTEGER, TEXT, NUMERIC, NUMERIC);
+DROP FUNCTION IF EXISTS create_professional_account_request(BIGINT, TEXT, TEXT, TEXT, TEXT, TEXT, INTEGER);
+DROP FUNCTION IF EXISTS create_professional_account_request(BIGINT, TEXT, TEXT, TEXT, TEXT, TEXT, TEXT, INTEGER);
 CREATE OR REPLACE FUNCTION create_professional_account_request(
     p_profile_id BIGINT,
     p_business_name TEXT,
     p_ruc TEXT,
-    p_address_text TEXT,
     p_public_name TEXT,
     p_title TEXT,
+    p_phone TEXT,
     p_document_url TEXT,
-    p_specialty_id INTEGER,
-    p_latitude NUMERIC DEFAULT NULL,
-    p_longitude NUMERIC DEFAULT NULL
+    p_specialty_id INTEGER
 ) RETURNS JSONB AS $$
 DECLARE
     v_account_id BIGINT;
@@ -39,42 +43,38 @@ BEGIN
             'detail', 'RUC inválido: debe tener 11 dígitos numéricos'
         );
     END IF;
-    
+
     -- Verificar si ya existe un perfil para este usuario
     IF EXISTS (SELECT 1 FROM professional_profiles WHERE profile_id = p_profile_id) THEN
         RAISE EXCEPTION 'Ya existe una solicitud de perfil profesional para este usuario';
     END IF;
-    
+
     -- Verificar si el RUC ya está registrado
     IF EXISTS (SELECT 1 FROM professional_profiles WHERE ruc = p_ruc) THEN
         RAISE EXCEPTION 'Este RUC ya está registrado en el sistema';
     END IF;
-    
-    -- Crear registro de perfil profesional
+
+    -- Crear registro de perfil profesional (modelo v2 - dirección no requerida aquí)
     INSERT INTO professional_profiles (
         profile_id,
         business_name,
         ruc,
-        address_text,
-        latitude,
-        longitude,
         public_name,
         title,
+        phone,
         legal_document_url,
         status
     ) VALUES (
         p_profile_id,
         p_business_name,
         p_ruc,
-        p_address_text,
-        p_latitude,
-        p_longitude,
         p_public_name,
         p_title,
+        p_phone,
         p_document_url,
         'pending'
     ) RETURNING id INTO v_account_id;
-    
+
     -- Insertar el servicio base inicial usando la especialidad principal proporcionada
     IF p_specialty_id IS NOT NULL THEN
         INSERT INTO professional_services (
@@ -93,13 +93,14 @@ BEGIN
             false -- Requiere que el profesional configure el precio luego
         );
     END IF;
-    
+
     -- TODO: Enviar email de confirmación de solicitud
     -- (Implementar con Supabase Edge Functions o trigger)
-    
+
     RETURN jsonb_build_object(
         'account_id', v_account_id,
-        'status', 'pending'
+        'status', 'pending',
+        'message', 'Registro exitoso. Completa tu perfil añadiendo direcciones desde tu panel.'
     );
 END;
 $$ LANGUAGE plpgsql SECURITY DEFINER;
@@ -108,9 +109,8 @@ $$ LANGUAGE plpgsql SECURITY DEFINER;
 -- HU-7.2: Catálogo Profesional
 -- ============================================================================
 
--- RPC: Listar profesionales publicados con filtros (actualizado con slug, is_available, phone)
--- Nota: Postgres no permite cambiar el RETURNS TABLE con CREATE OR REPLACE.
--- Por eso dropeamos primero la función existente (misma firma de parámetros).
+-- RPC: Listar profesionales publicados con filtros
+-- ACTUALIZADO: Incluye info de dirección del modelo v2
 DROP FUNCTION IF EXISTS get_published_professionals(INTEGER, TEXT, TEXT, TEXT, TEXT);
 DROP FUNCTION IF EXISTS get_published_professionals(BIGINT, TEXT, TEXT, TEXT, TEXT);
 CREATE OR REPLACE FUNCTION get_published_professionals(
@@ -126,9 +126,6 @@ RETURNS TABLE (
     public_name TEXT,
     title TEXT,
     profile_photo_url TEXT,
-    address_text TEXT,
-    latitude NUMERIC,
-    longitude NUMERIC,
     base_price NUMERIC,
     consultation_types TEXT[],
     average_rating NUMERIC,
@@ -136,19 +133,23 @@ RETURNS TABLE (
     specialty_name TEXT,
     specialty_slug TEXT,
     is_available BOOLEAN,
-    phone TEXT
+    phone TEXT,
+    -- Campos del modelo v2
+    primary_address_id BIGINT,
+    primary_address_name TEXT,
+    primary_address_district TEXT,
+    primary_address_province TEXT,
+    primary_address_latitude NUMERIC,
+    primary_address_longitude NUMERIC
 ) AS $$
 BEGIN
     RETURN QUERY
-    SELECT
+    SELECT DISTINCT ON (p.id)
         p.id,
         p.slug,
         p.public_name,
         p.title,
         p.profile_photo_url,
-        p.address_text,
-        p.latitude,
-        p.longitude,
         p.base_price,
         p.consultation_types,
         COALESCE(p.average_rating, 0),
@@ -156,19 +157,30 @@ BEGIN
         sp.name,
         sp.slug,
         COALESCE(p.is_available, true),
-        p.phone
+        p.phone,
+        pa.id as primary_address_id,
+        pa.name as primary_address_name,
+        pa.district as primary_address_district,
+        pa.province as primary_address_province,
+        pa.latitude as primary_address_latitude,
+        pa.longitude as primary_address_longitude
     FROM professional_profiles p
-    JOIN professional_services ps
-        ON ps.professional_profile_id = p.id
-    JOIN professional_specialties sp
-        ON sp.id = ps.professional_specialty_id
+    JOIN professional_services ps ON ps.professional_profile_id = p.id
+    JOIN professional_specialties sp ON sp.id = ps.professional_specialty_id
+    LEFT JOIN professional_addresses pa ON pa.professional_profile_id = p.id
+        AND pa.is_primary = true AND pa.is_active = true
     WHERE p.status = 'approved'
-            AND p.is_published = true
-      AND (p_specialty_id IS NULL OR ps.professional_specialty_id = p_specialty_id)
-      AND (p_consultation_type IS NULL OR p.consultation_types @> ARRAY[p_consultation_type])
-      AND (p_search IS NULL OR p.public_name ILIKE CONCAT('%', p_search, '%'))
-      AND (p_location IS NULL OR p.address_text ILIKE CONCAT('%', p_location, '%'))
-    ORDER BY
+        AND p.is_published = true
+        AND (p_specialty_id IS NULL OR ps.professional_specialty_id = p_specialty_id)
+        AND (p_consultation_type IS NULL OR p.consultation_types @> ARRAY[p_consultation_type])
+        AND (p_search IS NULL OR p.public_name ILIKE CONCAT('%', p_search, '%'))
+        AND (
+            p_location IS NULL OR
+            pa.district ILIKE CONCAT('%', p_location, '%') OR
+            pa.province ILIKE CONCAT('%', p_location, '%') OR
+            pa.address_line ILIKE CONCAT('%', p_location, '%')
+        )
+    ORDER BY p.id,
       CASE WHEN p_sort_by = 'rating' THEN p.average_rating END DESC,
       CASE WHEN p_sort_by = 'price_asc' THEN p.base_price END ASC,
       CASE WHEN p_sort_by = 'price_desc' THEN p.base_price END DESC,
@@ -178,6 +190,8 @@ END;
 $$ LANGUAGE plpgsql SECURITY DEFINER;
 
 -- RPC: Listar todos los profesionales (admin)
+-- ACTUALIZADO: Incluye campos del modelo v2
+DROP FUNCTION IF EXISTS get_all_professionals();
 CREATE OR REPLACE FUNCTION get_all_professionals()
 RETURNS TABLE (
     id BIGINT,
@@ -187,17 +201,19 @@ RETURNS TABLE (
     title TEXT,
     ruc TEXT,
     profile_photo_url TEXT,
-    address_text TEXT,
-    latitude NUMERIC,
-    longitude NUMERIC,
     base_price NUMERIC,
     consultation_types TEXT[],
     average_rating NUMERIC,
     total_reviews INTEGER,
     status TEXT,
     is_published BOOLEAN,
+    is_available BOOLEAN,
     created_at TIMESTAMPTZ,
-    updated_at TIMESTAMPTZ
+    updated_at TIMESTAMPTZ,
+    -- Nuevos campos v2
+    primary_address_district TEXT,
+    primary_address_province TEXT,
+    address_count INTEGER
 ) AS $$
 BEGIN
     IF NOT auth_has_role('admin') THEN
@@ -213,18 +229,24 @@ BEGIN
         p.title,
         p.ruc,
         p.profile_photo_url,
-        p.address_text,
-        p.latitude,
-        p.longitude,
         p.base_price,
         p.consultation_types,
         COALESCE(p.average_rating, 0),
         COALESCE(p.total_reviews, 0),
         p.status::text,
         COALESCE(p.is_published, false),
+        COALESCE(p.is_available, true),
         p.created_at,
-        p.updated_at
+        p.updated_at,
+        pa.district as primary_address_district,
+        pa.province as primary_address_province,
+        (
+            SELECT COUNT(*)
+            FROM professional_addresses pa2
+            WHERE pa2.professional_profile_id = p.id AND pa2.is_active = true
+        ) as address_count
     FROM professional_profiles p
+    LEFT JOIN professional_addresses pa ON pa.professional_profile_id = p.id AND pa.is_primary = true
     ORDER BY p.created_at DESC;
 END;
 $$ LANGUAGE plpgsql SECURITY DEFINER;
@@ -256,10 +278,10 @@ BEGIN
     ) THEN
         RAISE EXCEPTION 'Usuario no tiene cuenta Profesional aprobada';
     END IF;
-    
+
     -- Retornar productos con precios especiales
     RETURN QUERY
-    SELECT 
+    SELECT
         p.id,
         p.name,
         p.sku,
@@ -271,7 +293,7 @@ BEGIN
         p.weight_options,
         p.stock_quantity
     FROM products p
-    WHERE p.is_professional_product = TRUE 
+    WHERE p.is_professional_product = TRUE
       AND p.professional_discount_pct > 0
       AND p.status = 'active'
       AND p.is_active = TRUE
@@ -291,17 +313,17 @@ BEGIN
     END IF;
 
     -- Buscar cuenta del usuario
-    SELECT * INTO v_account 
-    FROM professional_profiles 
+    SELECT * INTO v_account
+    FROM professional_profiles
     WHERE profile_id = p_profile_id;
-    
+
     IF v_account IS NULL THEN
         RETURN jsonb_build_object(
             'eligible', false,
             'status', 'not_registered'
         );
     END IF;
-    
+
     IF v_account.status = 'approved' THEN
         RETURN jsonb_build_object(
             'eligible', true,
@@ -351,15 +373,15 @@ BEGIN
     SELECT * INTO v_account
     FROM professional_profiles
     WHERE id = p_account_id;
-    
+
     IF v_account IS NULL THEN
         RAISE EXCEPTION 'Cuenta no encontrada';
     END IF;
-    
+
     IF v_account.status != 'pending' THEN
         RAISE EXCEPTION 'Solo se pueden aprobar cuentas pendientes';
     END IF;
-    
+
     -- Actualizar estado
     UPDATE professional_profiles
     SET status = 'approved',
@@ -368,15 +390,15 @@ BEGIN
         is_published = true,
         updated_at = NOW()
     WHERE id = p_account_id;
-    
+
     -- Asignar rol resolviendo su ID por nombre
     INSERT INTO profile_roles (profile_id, role_id)
     SELECT v_account.profile_id, id FROM roles WHERE name = 'professional'
     ON CONFLICT (profile_id, role_id) DO NOTHING;
-    
+
     -- TODO: Enviar email de aprobación al usuario
     -- (Implementar con Supabase Edge Functions)
-    
+
     RETURN jsonb_build_object('account_id', p_account_id);
 END;
 $$ LANGUAGE plpgsql SECURITY DEFINER;
@@ -399,31 +421,31 @@ BEGIN
     IF p_reason IS NULL OR TRIM(p_reason) = '' THEN
         RAISE EXCEPTION 'Debe proporcionar un motivo de rechazo';
     END IF;
-    
+
     -- Obtener cuenta
     SELECT * INTO v_account
     FROM professional_profiles
     WHERE id = p_account_id;
-    
+
     IF v_account IS NULL THEN
         RAISE EXCEPTION 'Cuenta no encontrada';
     END IF;
-    
+
     IF v_account.status != 'pending' THEN
         RAISE EXCEPTION 'Solo se pueden rechazar cuentas pendientes';
     END IF;
-    
+
     -- Actualizar estado
     UPDATE professional_profiles
     SET status = 'rejected',
         rejection_reason = p_reason,
-        approved_by = p_admin_profile_id,  -- Registro de quién rechazó
+        approved_by = p_admin_profile_id,
         updated_at = NOW()
     WHERE id = p_account_id;
-    
+
     -- TODO: Enviar email de rechazo con motivo
     -- (Implementar con Supabase Edge Functions)
-    
+
     RETURN jsonb_build_object('account_id', p_account_id);
 END;
 $$ LANGUAGE plpgsql SECURITY DEFINER;
@@ -447,11 +469,11 @@ BEGIN
     SELECT * INTO v_account
     FROM professional_profiles
     WHERE id = p_account_id;
-    
+
     IF v_account IS NULL THEN
         RAISE EXCEPTION 'Cuenta no encontrada';
     END IF;
-    
+
     -- Determinar nuevo estado
     IF p_suspend THEN
         IF v_account.status != 'approved' THEN
@@ -464,13 +486,13 @@ BEGIN
         END IF;
         v_new_status := 'approved';
     END IF;
-    
+
     -- Actualizar estado
     UPDATE professional_profiles
     SET status = v_new_status,
         updated_at = NOW()
     WHERE id = p_account_id;
-    
+
     -- Actualizar rol del usuario resolviendo su ID por nombre
     IF v_new_status = 'approved' THEN
         INSERT INTO profile_roles (profile_id, role_id)
@@ -480,10 +502,63 @@ BEGIN
         DELETE FROM profile_roles
         WHERE profile_id = v_account.profile_id AND role_id = (SELECT id FROM roles WHERE name = 'professional');
     END IF;
-    
+
     RETURN jsonb_build_object(
         'account_id', p_account_id,
         'new_status', v_new_status
+    );
+END;
+$$ LANGUAGE plpgsql SECURITY DEFINER;
+
+-- ============================================================================
+-- RPC: Obtener detalle completo para admin
+-- ============================================================================
+CREATE OR REPLACE FUNCTION get_professional_admin_detail(
+    p_account_id BIGINT
+) RETURNS JSONB AS $$
+DECLARE
+    v_profile RECORD;
+    v_services JSONB;
+    v_addresses JSONB;
+    v_requests_count INTEGER;
+BEGIN
+    IF NOT auth_has_role('admin') THEN
+        RAISE EXCEPTION 'Acceso denegado: Se requiere rol de administrador';
+    END IF;
+
+    SELECT * INTO v_profile FROM professional_profiles WHERE id = p_account_id;
+    IF v_profile IS NULL THEN
+        RETURN jsonb_build_object('success', false, 'error', 'Perfil no encontrado');
+    END IF;
+
+    -- Obtener servicios
+    SELECT jsonb_agg(row_to_json(s)) INTO v_services
+    FROM (
+        SELECT ps.id, ps.name, ps.price, ps.is_active, sp.name as specialty_name
+        FROM professional_services ps
+        JOIN professional_specialties sp ON sp.id = ps.professional_specialty_id
+        WHERE ps.professional_profile_id = p_account_id
+    ) s;
+
+    -- Obtener direcciones
+    SELECT jsonb_agg(row_to_json(a)) INTO v_addresses
+    FROM (
+        SELECT pa.id, pa.name, pa.address_line, pa.district, pa.is_primary, pa.is_active
+        FROM professional_addresses pa
+        WHERE pa.professional_profile_id = p_account_id
+    ) a;
+
+    -- Contar solicitudes de cita
+    SELECT COUNT(*) INTO v_requests_count
+    FROM professional_appointment_requests
+    WHERE professional_profile_id = p_account_id;
+
+    RETURN jsonb_build_object(
+        'success', true,
+        'profile', row_to_json(v_profile),
+        'services', COALESCE(v_services, '[]'::jsonb),
+        'addresses', COALESCE(v_addresses, '[]'::jsonb),
+        'appointment_requests_count', v_requests_count
     );
 END;
 $$ LANGUAGE plpgsql SECURITY DEFINER;
