@@ -413,7 +413,12 @@ BEGIN
         'name', ps.name,
         'description', ps.description,
         'price', ps.price,
-        'specialty_name', sp.name
+        'specialty_name', sp.name,
+        'address_ids', (
+            SELECT COALESCE(jsonb_agg(pas.professional_address_id), '[]'::jsonb)
+            FROM professional_address_services pas
+            WHERE pas.professional_service_id = ps.id AND pas.is_active = true
+        )
     ) ORDER BY ps.is_active DESC) INTO v_services
     FROM professional_services ps
     JOIN professional_specialties sp ON sp.id = ps.professional_specialty_id

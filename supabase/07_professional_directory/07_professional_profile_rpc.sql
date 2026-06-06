@@ -37,7 +37,12 @@ BEGIN
     SELECT jsonb_agg(row_to_json(s)) INTO v_services
     FROM (
         SELECT ps.id, ps.name, ps.description, ps.price, ps.is_active,
-               sp.name as specialty_name, sp.id as specialty_id
+               sp.name as specialty_name, sp.id as specialty_id,
+               COALESCE((
+                   SELECT array_agg(pas.professional_address_id)
+                   FROM professional_address_services pas
+                   WHERE pas.professional_service_id = ps.id
+               ), ARRAY[]::bigint[]) as address_ids
         FROM professional_services ps
         JOIN professional_specialties sp ON sp.id = ps.professional_specialty_id
         WHERE ps.professional_profile_id = v_profile.id
@@ -179,11 +184,13 @@ CREATE OR REPLACE FUNCTION upsert_professional_service(
     p_description TEXT DEFAULT NULL,
     p_price NUMERIC DEFAULT 0,
     p_is_active BOOLEAN DEFAULT true,
-    p_service_id BIGINT DEFAULT NULL
+    p_service_id BIGINT DEFAULT NULL,
+    p_address_ids BIGINT[] DEFAULT '{}'::BIGINT[]
 ) RETURNS JSONB AS $$
 DECLARE
     v_professional_id BIGINT;
     v_service_id BIGINT;
+    v_addr_id BIGINT;
 BEGIN
     -- Validar identidad
     IF NOT EXISTS (SELECT 1 FROM profiles WHERE id = p_profile_id AND user_id = auth.uid()) THEN
@@ -202,9 +209,14 @@ BEGIN
             name = p_name,
             description = p_description,
             price = p_price,
-            is_active = p_is_active
+            is_active = p_is_active,
+            updated_at = NOW()
         WHERE id = p_service_id AND professional_profile_id = v_professional_id
         RETURNING id INTO v_service_id;
+
+        IF v_service_id IS NULL THEN
+             RETURN jsonb_build_object('success', false, 'error', 'Servicio no encontrado o sin permisos');
+        END IF;
     ELSE
         -- Crear nuevo servicio
         INSERT INTO professional_services (
@@ -212,6 +224,19 @@ BEGIN
         ) VALUES (
             v_professional_id, p_specialty_id, p_name, p_description, p_price, p_is_active
         ) RETURNING id INTO v_service_id;
+    END IF;
+
+    -- Limpiar asociaciones anteriores
+    DELETE FROM professional_address_services
+    WHERE professional_service_id = v_service_id;
+
+    -- Insertar nuevas asociaciones
+    IF p_address_ids IS NOT NULL AND array_length(p_address_ids, 1) > 0 THEN
+        FOREACH v_addr_id IN ARRAY p_address_ids
+        LOOP
+            INSERT INTO professional_address_services (professional_address_id, professional_service_id, is_active)
+            VALUES (v_addr_id, v_service_id, true);
+        END LOOP;
     END IF;
 
     RETURN jsonb_build_object('success', true, 'service_id', v_service_id);
