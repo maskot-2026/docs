@@ -563,6 +563,7 @@ CREATE OR REPLACE FUNCTION complete_appointment_request(
 ) RETURNS JSONB AS $$
 DECLARE
     v_request RECORD;
+    v_client_user_id UUID;
 BEGIN
     -- Obtener solicitud
     SELECT * INTO v_request
@@ -583,6 +584,29 @@ BEGIN
         completed_at = NOW(),
         updated_at = NOW()
     WHERE id = p_request_id;
+
+    -- Insertar notificación para el cliente
+    SELECT user_id INTO v_client_user_id
+    FROM profiles
+    WHERE id = v_request.client_profile_id;
+
+    IF v_client_user_id IS NOT NULL THEN
+        INSERT INTO notifications (
+            user_id,
+            type,
+            title,
+            message,
+            reference_type,
+            reference_id
+        ) VALUES (
+            v_client_user_id,
+            'appointment_completed',
+            'Cita completada',
+            'Tu cita para ' || COALESCE(v_request.pet_name, 'tu mascota') || ' ha finalizado. ¡Déjanos tu reseña!',
+            'professional_appointment_requests',
+            p_request_id::TEXT
+        );
+    END IF;
 
     RETURN jsonb_build_object('success', true, 'message', 'Atención completada. El cliente puede dejar un review.');
 END;
@@ -1102,7 +1126,7 @@ BEGIN
         'reason', par.reason,
         'status', par.status::text,
         'rejection_reason', par.rejection_reason,
-        'professional_response', pr_response.review_id,
+        'professional_response', pr_response.professional_response,
         'has_review', EXISTS(SELECT 1 FROM professional_reviews WHERE appointment_request_id = par.id),
         'created_at', par.created_at
     ) ORDER BY par.created_at DESC) INTO v_requests
@@ -1118,4 +1142,4 @@ BEGIN
         'requests', COALESCE(v_requests, '[]'::jsonb)
     );
 END;
-$$ LANGUAGE plpgsql SECURITY DEFINER;
+$$ LANGUAGE plpgsql SECURITY INVOKER;
