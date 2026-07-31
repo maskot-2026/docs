@@ -26,7 +26,12 @@ CREATE OR REPLACE FUNCTION create_professional_account_request(
     p_title TEXT,
     p_phone TEXT,
     p_document_url TEXT,
-    p_specialty_id INTEGER
+    p_specialty_id INTEGER,
+    p_address_text TEXT,
+    p_latitude NUMERIC DEFAULT NULL,
+    p_longitude NUMERIC DEFAULT NULL,
+    p_license_number TEXT DEFAULT NULL,
+    p_license_document_url TEXT DEFAULT NULL
 ) RETURNS JSONB AS $$
 DECLARE
     v_account_id BIGINT;
@@ -63,6 +68,11 @@ BEGIN
         title,
         phone,
         legal_document_url,
+        license_number,
+        license_document_url,
+        address_text,
+        latitude,
+        longitude,
         status
     ) VALUES (
         p_profile_id,
@@ -72,6 +82,11 @@ BEGIN
         p_title,
         p_phone,
         p_document_url,
+        p_license_number,
+        p_license_document_url,
+        p_address_text,
+        p_latitude,
+        p_longitude,
         'pending'
     ) RETURNING id INTO v_account_id;
 
@@ -118,7 +133,10 @@ CREATE OR REPLACE FUNCTION get_published_professionals(
     p_consultation_type TEXT DEFAULT NULL,
     p_search TEXT DEFAULT NULL,
     p_location TEXT DEFAULT NULL,
-    p_sort_by TEXT DEFAULT 'rating'
+    p_sort_by TEXT DEFAULT 'rating',
+    p_lat NUMERIC DEFAULT NULL,
+    p_lng NUMERIC DEFAULT NULL,
+    p_radius_km NUMERIC DEFAULT NULL
 )
 RETURNS TABLE (
     id BIGINT,
@@ -140,11 +158,12 @@ RETURNS TABLE (
     primary_address_district TEXT,
     primary_address_province TEXT,
     primary_address_latitude NUMERIC,
-    primary_address_longitude NUMERIC
+    primary_address_longitude NUMERIC,
+    addresses JSONB
 ) AS $$
 BEGIN
     RETURN QUERY
-    SELECT DISTINCT ON (p.id)
+    SELECT 
         p.id,
         p.slug,
         p.public_name,
@@ -154,21 +173,45 @@ BEGIN
         p.consultation_types,
         COALESCE(p.average_rating, 0),
         COALESCE(p.total_reviews, 0),
-        sp.name,
-        sp.slug,
+        MAX(sp.name) as specialty_name,
+        MAX(sp.slug) as specialty_slug,
         COALESCE(p.is_available, true),
         p.phone,
-        pa.id as primary_address_id,
-        pa.name as primary_address_name,
-        pa.district as primary_address_district,
-        pa.province as primary_address_province,
-        pa.latitude as primary_address_latitude,
-        pa.longitude as primary_address_longitude
+        MAX(CASE WHEN pa.is_primary = true THEN pa.id END) as primary_address_id,
+        MAX(CASE WHEN pa.is_primary = true THEN pa.name END) as primary_address_name,
+        MAX(CASE WHEN pa.is_primary = true THEN pa.district END) as primary_address_district,
+        MAX(CASE WHEN pa.is_primary = true THEN pa.province END) as primary_address_province,
+        MAX(CASE WHEN pa.is_primary = true THEN pa.latitude END) as primary_address_latitude,
+        MAX(CASE WHEN pa.is_primary = true THEN pa.longitude END) as primary_address_longitude,
+        jsonb_agg(
+            jsonb_build_object(
+                'id', pa.id,
+                'name', pa.name,
+                'address_line', pa.address_line,
+                'district', pa.district,
+                'province', pa.province,
+                'latitude', pa.latitude,
+                'longitude', pa.longitude,
+                'is_primary', pa.is_primary,
+                'address_type', pa.address_type,
+                'custom_price', pa.custom_price
+            )
+        ) FILTER (
+            WHERE pa.id IS NOT NULL
+            AND (
+                p_lat IS NULL OR p_lng IS NULL OR p_radius_km IS NULL OR
+                pa.latitude IS NULL OR pa.longitude IS NULL OR
+                (6371 * 2 * asin(sqrt(
+                    power(sin(radians(pa.latitude - p_lat) / 2), 2) +
+                    cos(radians(p_lat)) * cos(radians(pa.latitude)) *
+                    power(sin(radians(pa.longitude - p_lng) / 2), 2)
+                ))) <= p_radius_km
+            )
+        ) as addresses
     FROM professional_profiles p
     JOIN professional_services ps ON ps.professional_profile_id = p.id
     JOIN professional_specialties sp ON sp.id = ps.professional_specialty_id
-    LEFT JOIN professional_addresses pa ON pa.professional_profile_id = p.id
-        AND pa.is_primary = true AND pa.is_active = true
+    LEFT JOIN professional_addresses pa ON pa.professional_profile_id = p.id AND pa.is_active = true
     WHERE p.status = 'approved'
         AND p.is_published = true
         AND (p_specialty_id IS NULL OR ps.professional_specialty_id = p_specialty_id)
@@ -176,12 +219,33 @@ BEGIN
         AND (p_search IS NULL OR p.public_name ILIKE CONCAT('%', p_search, '%'))
         AND (
             p_location IS NULL OR
-            pa.district ILIKE CONCAT('%', p_location, '%') OR
-            pa.province ILIKE CONCAT('%', p_location, '%') OR
-            pa.address_line ILIKE CONCAT('%', p_location, '%')
+            EXISTS (
+                SELECT 1 FROM professional_addresses pa_loc 
+                WHERE pa_loc.professional_profile_id = p.id 
+                AND pa_loc.is_active = true 
+                AND (pa_loc.district ILIKE CONCAT('%', p_location, '%') OR pa_loc.province ILIKE CONCAT('%', p_location, '%'))
+            )
         )
-    ORDER BY p.id,
-      CASE WHEN p_sort_by = 'rating' THEN p.average_rating END DESC,
+        AND (
+            p_lat IS NULL OR p_lng IS NULL OR p_radius_km IS NULL OR
+            EXISTS (
+                SELECT 1 FROM professional_addresses pa_dist
+                WHERE pa_dist.professional_profile_id = p.id
+                AND pa_dist.is_active = true
+                AND pa_dist.latitude IS NOT NULL
+                AND pa_dist.longitude IS NOT NULL
+                AND (
+                    6371 * 2 * asin(sqrt(
+                        power(sin(radians(pa_dist.latitude - p_lat) / 2), 2) +
+                        cos(radians(p_lat)) * cos(radians(pa_dist.latitude)) *
+                        power(sin(radians(pa_dist.longitude - p_lng) / 2), 2)
+                    ))
+                ) <= p_radius_km
+            )
+        )
+    GROUP BY p.id
+    ORDER BY 
+      CASE WHEN p_sort_by = 'rating' THEN COALESCE(MAX(p.average_rating), 0) END DESC,
       CASE WHEN p_sort_by = 'price_asc' THEN p.base_price END ASC,
       CASE WHEN p_sort_by = 'price_desc' THEN p.base_price END DESC,
       CASE WHEN p_sort_by = 'name' THEN p.public_name END ASC,
@@ -213,7 +277,10 @@ RETURNS TABLE (
     -- Nuevos campos v2
     primary_address_district TEXT,
     primary_address_province TEXT,
-    address_count INTEGER
+    address_count INTEGER,
+    -- Campos de colegiatura
+    license_number TEXT,
+    license_document_url TEXT
 ) AS $$
 BEGIN
     IF NOT auth_has_role('admin') THEN
@@ -244,7 +311,9 @@ BEGIN
             SELECT COUNT(*)
             FROM professional_addresses pa2
             WHERE pa2.professional_profile_id = p.id AND pa2.is_active = true
-        ) as address_count
+        )::INTEGER as address_count,
+        p.license_number,
+        p.license_document_url
     FROM professional_profiles p
     LEFT JOIN professional_addresses pa ON pa.professional_profile_id = p.id AND pa.is_primary = true
     ORDER BY p.created_at DESC;

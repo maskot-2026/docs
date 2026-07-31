@@ -50,6 +50,8 @@ BEGIN
         'latitude', pa.latitude,
         'longitude', pa.longitude,
         'phone', pa.phone,
+        'address_type', pa.address_type,
+        'custom_price', pa.custom_price,
         'is_primary', pa.is_primary,
         'is_active', pa.is_active,
         'created_at', pa.created_at
@@ -77,6 +79,8 @@ CREATE OR REPLACE FUNCTION upsert_professional_address(
     p_latitude NUMERIC DEFAULT NULL,
     p_longitude NUMERIC DEFAULT NULL,
     p_phone TEXT DEFAULT NULL,
+    p_address_type TEXT DEFAULT 'physical',
+    p_custom_price NUMERIC DEFAULT NULL,
     p_is_primary BOOLEAN DEFAULT false,
     p_is_active BOOLEAN DEFAULT true
 ) RETURNS JSONB AS $$
@@ -118,6 +122,8 @@ BEGIN
             latitude = p_latitude,
             longitude = p_longitude,
             phone = p_phone,
+            address_type = p_address_type,
+            custom_price = p_custom_price,
             is_primary = p_is_primary,
             is_active = p_is_active,
             updated_at = NOW()
@@ -128,11 +134,11 @@ BEGIN
         INSERT INTO professional_addresses (
             professional_profile_id, name, address_line, reference,
             district, province, department, latitude, longitude,
-            phone, is_primary, is_active
+            phone, address_type, custom_price, is_primary, is_active
         ) VALUES (
             v_professional_id, p_name, p_address_line, p_reference,
             p_district, p_province, p_department, p_latitude, p_longitude,
-            p_phone, p_is_primary, p_is_active
+            p_phone, p_address_type, p_custom_price, p_is_primary, p_is_active
         ) RETURNING id INTO v_address_id;
     END IF;
 
@@ -432,6 +438,11 @@ BEGIN
         WHERE id = p_professional_id AND status = 'approved' AND is_published = true AND is_available = true
     ) THEN
         RETURN jsonb_build_object('success', false, 'error', 'Profesional no disponible');
+    END IF;
+
+    -- Validar que el profesional no se agende a sí mismo
+    IF p_professional_id = p_client_profile_id THEN
+        RETURN jsonb_build_object('success', false, 'error', 'No puedes agendar una cita contigo mismo');
     END IF;
 
     -- Validar que la dirección existe y está activa

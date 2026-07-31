@@ -138,6 +138,12 @@ CREATE TABLE IF NOT EXISTS public.professional_addresses (
     -- Teléfono de contacto de la sede
     phone text,
 
+    -- Tipo de sede (physical, virtual, home_visit)
+    address_type text NOT NULL DEFAULT 'physical',
+    
+    -- Precio personalizado para esta sede (si es nulo, usa el base_price del perfil)
+    custom_price numeric,
+
     -- Indicadores
     is_primary boolean NOT NULL DEFAULT false,
     is_active boolean NOT NULL DEFAULT true,
@@ -150,7 +156,10 @@ CREATE TABLE IF NOT EXISTS public.professional_addresses (
     CONSTRAINT professional_addresses_professional_profile_id_fkey
         FOREIGN KEY (professional_profile_id)
         REFERENCES public.professional_profiles(id)
-        ON DELETE CASCADE
+        ON DELETE CASCADE,
+
+    CONSTRAINT professional_addresses_type_check
+        CHECK (address_type IN ('physical', 'virtual', 'home_visit'))
 );
 
 CREATE INDEX IF NOT EXISTS idx_professional_addresses_professional

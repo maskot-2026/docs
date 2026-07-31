@@ -164,6 +164,8 @@ BEGIN
         'latitude', pa.latitude,
         'longitude', pa.longitude,
         'phone', pa.phone,
+        'address_type', pa.address_type,
+        'custom_price', pa.custom_price,
         'is_primary', pa.is_primary
     ) ORDER BY pa.is_primary DESC, pa.id) INTO v_addresses
     FROM professional_addresses pa
@@ -435,6 +437,8 @@ BEGIN
         'latitude', pa.latitude,
         'longitude', pa.longitude,
         'phone', pa.phone,
+        'address_type', pa.address_type,
+        'custom_price', pa.custom_price,
         'is_primary', pa.is_primary
     ) ORDER BY pa.is_primary DESC, pa.id) INTO v_addresses
     FROM professional_addresses pa

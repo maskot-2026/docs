@@ -1816,8 +1816,8 @@ INSERT INTO professional_page_config (
 
 **Criterios de Aceptación:**
 
-- [x] Formulario unificado de registro: Datos legales (RUC, Empresa) + Datos del Perfil (Título profesional, y selección de primera Especialidad/Servicio).
-- [x] Estado de validación por parte de MasKot (Pendiente, Aprobado, Rechazado, Suspendido).
+- [x] Formulario unificado de registro: Datos legales (RUC, Empresa, Documento de Identidad) + Colegiatura Profesional (Código CMVP y foto de carnet) + Datos del Perfil (Título profesional, dirección en mapa, y selección de primera Especialidad/Servicio).
+- [x] Estado de validación por parte de MasKot (Pendiente, Aprobado, Rechazado, Suspendido), permitiendo al administrador revisar la foto del carnet de colegiatura antes de aprobar.
 - [x] Una vez "Aprobado", el perfil puede publicarse (`is_published = true`) y el profesional obtiene automáticamente los precios especiales en la tienda.
 - [x] Panel de gestión: Configuración de Nombre público, Título (Ej: Médico Veterinario), y gestión de su Catálogo de Servicios (asignando a qué Especialidad del sistema pertenece cada servicio).
 - [x] Experiencia y Resumen (Texto descriptivo + lista de condiciones tratadas `treated_conditions`).
